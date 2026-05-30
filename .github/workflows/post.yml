@@ -1,0 +1,19 @@
+name: Crypto Alpha Daily
+
+on:
+  schedule:
+    - cron: '0 8 * * *'    # 8 AM UTC — Morning brief
+    - cron: '0 13 * * *'   # 1 PM UTC — Midday pulse
+    - cron: '0 19 * * *'   # 7 PM UTC — Evening wrap
+  workflow_dispatch:        # Manual trigger anytime
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - run: python bot.py
