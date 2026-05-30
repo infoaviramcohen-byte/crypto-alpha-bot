@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 
 BOT_TOKEN = "8944585311:AAEH3vYOuBZStInpsm5FLxtawqQp7MfxE-E"
 CHANNEL_ID = "@crypto_alpha_daily"
-SITE_URL = "https://guardis.io"
 
 def send(text):
     requests.post(
@@ -59,7 +58,7 @@ def morning():
 Smart money spotted this early. Did you?
 
 ⚡ Copy the wallets catching these moves automatically.
-👉 <a href="{SITE_URL}">{SITE_URL}</a>
+💬 Share this with a trader who needs to see it.
 
 <i>📡 @crypto_alpha_daily — Pure alpha, no noise.</i>"""
 
@@ -85,7 +84,7 @@ def afternoon():
 💡 These aren't random — wallets with 10x track records are accumulating.
 
 🎯 Don't chase. Copy.
-👉 <a href="{SITE_URL}">{SITE_URL}</a>
+💬 Forward this to your trading group.
 
 <i>📡 @crypto_alpha_daily — We find it first.</i>"""
 
@@ -108,7 +107,7 @@ def evening():
 💬 {sentiment_take}
 
 🔁 Track and copy the top 1% wallets on Solana.
-👉 <a href="{SITE_URL}">{SITE_URL}</a>
+💬 Know a trader who'd want this? Send them the channel.
 
 <i>📡 @crypto_alpha_daily — Tomorrow's alpha, tonight.</i>"""
 
