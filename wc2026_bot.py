@@ -5,7 +5,6 @@ import random
 BOT_TOKEN = "8745600762:AAERjdVIaH5nSohseKif8olMkfuUU-R7jVg"
 CHANNEL_ID = "@WC2026signals"
 
-# WC2026 Group Stage schedule (kickoff times UTC)
 MATCHES = [
     {"date": "2026-06-11", "home": "Mexico", "away": "Ecuador", "group": "A", "time": "23:00"},
     {"date": "2026-06-12", "home": "USA", "away": "Canada", "group": "B", "time": "02:00"},
@@ -21,36 +20,103 @@ MATCHES = [
     {"date": "2026-06-16", "home": "Italy", "away": "Cameroon", "group": "L", "time": "18:00"},
 ]
 
-TEAM_TIPS = {
-    "Argentina": ("Both Teams to Score", "Argentina attack creates chances but leave gaps"),
-    "Brazil": ("Over 2.5 Goals", "Brazil's attack has been relentless in qualifiers"),
-    "France": ("France Win & Over 1.5", "France have best squad depth in the tournament"),
-    "England": ("England Win to Nil", "England's defence has been rock solid"),
-    "Spain": ("Over 2.5 Goals", "Spain's tiki-taka generates volume chances"),
-    "Germany": ("Germany Win", "Germany always perform at World Cups"),
-    "Portugal": ("Ronaldo Anytime Scorer", "Ronaldo hungry to prove himself one last time"),
-    "Netherlands": ("Netherlands Win", "Netherlands have a well-balanced squad"),
-    "USA": ("USA to Score", "Host nation energy will drive them forward"),
-    "Mexico": ("Mexico Win", "Home crowd advantage is massive in CONCACAF"),
-    "Japan": ("Japan & Under 2.5", "Japan are defensively disciplined"),
-    "Italy": ("Italy Win to Nil", "Italy's Azzurri defence is world class"),
+TEAM_ANALYSIS = {
+    "Argentina": {
+        "tip": "Both Teams to Score",
+        "reason": "Argentina's attack is world class but they concede chances. Opponents raise their game against them.",
+        "key_player": "Lautaro Martínez — clinical in big matches",
+        "stat": "Argentina conceded in 7 of their last 10 internationals"
+    },
+    "Brazil": {
+        "tip": "Over 2.5 Goals",
+        "reason": "Brazil averaged 3.1 goals per game in qualifiers. Attack is relentless.",
+        "key_player": "Vinicius Jr — unstoppable in open space",
+        "stat": "Brazil scored 2+ goals in 8 of last 10 matches"
+    },
+    "France": {
+        "tip": "France Win & Over 1.5",
+        "reason": "Deepest squad in the tournament. Mbappé + Dembélé is unplayable on the break.",
+        "key_player": "Kylian Mbappé — top scorer favourite",
+        "stat": "France won 9 of last 10 competitive matches"
+    },
+    "England": {
+        "tip": "Win to Nil",
+        "reason": "England's defence has been the best in Europe. Pickford commanding in goal.",
+        "key_player": "Jude Bellingham — drives from midfield into attacking positions",
+        "stat": "England kept 6 clean sheets in last 10 games"
+    },
+    "Spain": {
+        "tip": "Over 2.5 Goals",
+        "reason": "Spain's tiki-taka generates 15+ shots per game. High tempo, high volume.",
+        "key_player": "Pedri — controls the tempo and creates for others",
+        "stat": "Spain averaged 2.9 goals per game in Euro 2024"
+    },
+    "Germany": {
+        "tip": "Germany Win",
+        "reason": "Tournament football brings out the best in Germany. Home World Cup mentality despite playing away.",
+        "key_player": "Florian Wirtz — creative spark in the final third",
+        "stat": "Germany lost only 1 of last 12 competitive matches"
+    },
+    "Portugal": {
+        "tip": "Over 2.5 Goals",
+        "reason": "Portugal's attack is loaded — Ronaldo, Félix, Leão. They go forward with intent.",
+        "key_player": "Cristiano Ronaldo — motivated to end career with WC trophy",
+        "stat": "Portugal scored 3+ goals in 5 of last 8 matches"
+    },
+    "Netherlands": {
+        "tip": "Netherlands Win",
+        "reason": "Van Dijk organises one of the tightest defences at the tournament.",
+        "key_player": "Cody Gakpo — electric on the left, creates and scores",
+        "stat": "Netherlands unbeaten in last 8 competitive matches"
+    },
+    "Mexico": {
+        "tip": "Mexico to Score",
+        "reason": "Host nation energy is massive. Mexico always perform at home World Cups.",
+        "key_player": "Hirving Lozano — pace and directness on the wing",
+        "stat": "Mexico scored in all 10 home qualifiers"
+    },
+    "USA": {
+        "tip": "USA to Score",
+        "reason": "Young, fast, hungry squad. Playing at home in front of massive crowd.",
+        "key_player": "Christian Pulisic — captain, leader, match-winner",
+        "stat": "USA scored in 8 of last 10 matches"
+    },
+    "Japan": {
+        "tip": "Under 2.5 Goals",
+        "reason": "Japan are tactically disciplined. They defend deep and hit on the counter.",
+        "key_player": "Takefusa Kubo — quick and direct, dangerous on transition",
+        "stat": "Japan kept clean sheet in 5 of last 8 matches"
+    },
+    "Italy": {
+        "tip": "Italy Win to Nil",
+        "reason": "Azzurri defence is world class. They make matches compact and hard to score against.",
+        "key_player": "Federico Chiesa — pace and directness in attack",
+        "stat": "Italy conceded less than 1 goal per game in qualifiers"
+    },
 }
 
-VALUE_BETS = [
-    ("Both Teams to Score", "High-tempo group stage matches favour BTTS — over 68% hit rate in last WC"),
-    ("Over 2.5 Goals", "Group stage averages 2.7 goals per game historically"),
-    ("First Half Over 1.5", "Teams attack early to set the tone — great value pre-match"),
-    ("Asian Handicap -0.5 Favourite", "Top seeds rarely drop points in group openers"),
-    ("Anytime Goalscorer", "Star players show up on the biggest stage"),
-    ("Draw No Bet — Favourite", "Eliminate the draw risk on heavy favourites"),
+WC_STATS = [
+    ("68%", "of World Cup group matches have both teams scoring"),
+    ("73%", "of top-seeded teams win their opening match"),
+    ("2.7", "average goals per game in WC group stage historically"),
+    ("81%", "of group stage favourites advance to knockout rounds"),
+    ("43%", "of WC group games end with Over 2.5 goals"),
+    ("62%", "of World Cup openers are won by the home/favoured team"),
+    ("3", "average corners per half in WC group stage matches"),
+    ("78%", "of WC matches have a goal in the first 45 minutes"),
 ]
 
-BONUSES = [
-    ("100% Welcome Bonus up to $200", "New accounts only · T&Cs apply"),
-    ("Bet $10 Get $30 in Free Bets", "Min deposit $10 · Free bets expire in 7 days"),
-    ("Enhanced Odds on All WC2026 Matches", "Available for 24h only · Max stake $5"),
-    ("Money Back if Your Team Loses", "Up to $50 refund as free bet · Selected markets"),
-    ("Accumulator Boost — 50% Extra Winnings", "On 4+ leg accumulators · Every matchday"),
+TOURNAMENT_FACTS = [
+    "48 teams competing for the first time in WC history — more upsets expected than ever",
+    "104 matches across USA, Canada and Mexico — biggest World Cup ever",
+    "The group stage alone has more matches than entire previous World Cups",
+    "6 host cities in the USA including New York, LA, Dallas, Miami, San Francisco and Seattle",
+    "Argentina enter as defending champions — only 8 teams have successfully defended the WC title",
+    "Brazil have never been eliminated in the group stage of a World Cup",
+    "France are the only team to win the World Cup with a squad worth over €1 billion",
+    "Germany have reached at least the semi-finals in 8 of the last 10 World Cups",
+    "Portugal have never won the World Cup despite having one of the most decorated squads in history",
+    "England last won the World Cup in 1966 — 60 years of hurt ends here?",
 ]
 
 def send(text):
@@ -69,141 +135,134 @@ def get_tomorrows_matches():
 
 def get_next_matches(n=3):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    upcoming = [m for m in MATCHES if m["date"] >= today]
-    return upcoming[:n]
+    return [m for m in MATCHES if m["date"] >= today][:n]
+
+def days_to_wc():
+    delta = datetime(2026, 6, 11, tzinfo=timezone.utc) - datetime.now(timezone.utc)
+    return max(0, delta.days)
 
 def morning():
     today_matches = get_todays_matches()
     next_matches = get_next_matches(3)
-    vbet, vreason = random.choice(VALUE_BETS)
-    bonus, bcond = random.choice(BONUSES)
+    stat_val, stat_label = random.choice(WC_STATS)
+    fact = random.choice(TOURNAMENT_FACTS)
 
     if today_matches:
         match_lines = ""
         for m in today_matches:
-            tip_market, tip_reason = TEAM_TIPS.get(m["home"], ("Home Win", "Strong home performance expected"))
+            analysis = TEAM_ANALYSIS.get(m["home"], {})
             match_lines += f"\n⚽ <b>{m['home']} vs {m['away']}</b> — Group {m['group']} · {m['time']} UTC\n"
-            match_lines += f"📌 Our Pick: <b>{tip_market}</b>\n"
-            match_lines += f"💡 {tip_reason}\n"
+            match_lines += f"🔍 Pick: <b>{analysis.get('tip', 'Home Win')}</b>\n"
+            match_lines += f"💡 {analysis.get('reason', '')}\n"
+            match_lines += f"⭐ Key player: {analysis.get('key_player', '')}\n"
+            match_lines += f"📊 {analysis.get('stat', '')}\n"
 
         return f"""🌅 <b>WC2026 MATCH DAY BRIEF</b>
 
-🏆 <b>Today's Fixtures & Picks:</b>
 {match_lines}
-📊 <b>Value Bet of the Day:</b>
-<b>{vbet}</b> — {vreason}
+📊 <b>Stat of the day:</b>
+<b>{stat_val}</b> — {stat_label}
 
-🎁 <b>Best Bonus Today:</b>
-{bonus}
-<i>{bcond}</i>
-
-💬 Share with your betting group — let's win together.
 📡 @WC2026signals"""
 
     else:
+        d = days_to_wc()
+        countdown = f"⏳ <b>{d} days</b> until kickoff!" if d > 0 else "🚨 The World Cup is HERE!"
+
         next_lines = ""
         for m in next_matches:
             next_lines += f"• <b>{m['home']} vs {m['away']}</b> — {m['date']} · Group {m['group']}\n"
-
-        days_to_wc = (datetime(2026, 6, 11, tzinfo=timezone.utc) - datetime.now(timezone.utc)).days
-        countdown = f"⏳ <b>{max(0, days_to_wc)} days</b> until kickoff!" if days_to_wc > 0 else "🚨 <b>The World Cup is HERE!</b>"
 
         return f"""🌅 <b>WC2026 MORNING BRIEF</b>
 
 {countdown}
 
-📅 <b>Next Matches to Watch:</b>
+📅 <b>Upcoming Fixtures:</b>
 {next_lines}
-📊 <b>Pre-Tournament Value Bet:</b>
-<b>{vbet}</b> — {vreason}
+🧠 <b>Did you know?</b>
+{fact}
 
-🎁 <b>Best Bonus Right Now:</b>
-{bonus}
-<i>{bcond}</i>
+📊 <b>Key stat:</b> {stat_val} — {stat_label}
 
-💬 Forward this to your group — more members = better intel.
 📡 @WC2026signals"""
 
 def afternoon():
+    today_matches = get_todays_matches()
     next_matches = get_next_matches(2)
-    vbet, vreason = random.choice(VALUE_BETS)
-    bonus, bcond = random.choice(BONUSES)
+    stat_val, stat_label = random.choice(WC_STATS)
 
-    match_lines = ""
-    for m in next_matches:
-        tip_market, tip_reason = TEAM_TIPS.get(m["home"], ("Home Win", "Form suggests home advantage"))
-        match_lines += f"⚽ <b>{m['home']} vs {m['away']}</b>\n📌 {tip_market} · {tip_reason}\n\n"
+    if today_matches:
+        m = today_matches[0]
+        analysis = TEAM_ANALYSIS.get(m["home"], {})
+        home_analysis = TEAM_ANALYSIS.get(m["home"], {})
+        away_analysis = TEAM_ANALYSIS.get(m["away"], {})
 
-    stats = [
-        ("68%", "of WC group matches have BTTS"),
-        ("73%", "of WC favourites win their opener"),
-        ("2.7", "average goals per WC group game"),
-        ("81%", "of top seeds advance from groups"),
-    ]
-    stat_val, stat_label = random.choice(stats)
+        return f"""⚡ <b>MATCH PREVIEW — {m['home'].upper()} vs {m['away'].upper()}</b>
 
-    return f"""⚡ <b>ODDS ALERT — MIDDAY PULSE</b>
+🏟️ Group {m['group']} · Kickoff {m['time']} UTC
 
-📈 <b>Stat that matters:</b>
+🔵 <b>{m['home']}:</b>
+{home_analysis.get('reason', 'Strong contenders')}
+⭐ Watch: {home_analysis.get('key_player', 'TBC')}
+
+🔴 <b>{m['away']}:</b>
+{away_analysis.get('reason', 'Dangerous opposition')}
+⭐ Watch: {away_analysis.get('key_player', 'TBC')}
+
+📊 <b>Our Analysis:</b> <b>{home_analysis.get('tip', 'Home Win')}</b>
+{home_analysis.get('stat', '')}
+
+📡 @WC2026signals"""
+
+    else:
+        match_lines = ""
+        for m in next_matches:
+            analysis = TEAM_ANALYSIS.get(m["home"], {})
+            match_lines += f"⚽ <b>{m['home']} vs {m['away']}</b> — {m['date']}\n"
+            match_lines += f"📌 {analysis.get('tip', 'Home Win')} · {analysis.get('reason', '')}\n\n"
+
+        return f"""⚡ <b>WC2026 ANALYSIS — MIDDAY</b>
+
+🔍 <b>Matches to analyse:</b>
+{match_lines}
+📊 <b>Sharp stat:</b>
 <b>{stat_val}</b> — {stat_label}
 
-🔍 <b>Upcoming Value Plays:</b>
-{match_lines}🎯 <b>Sharp Pick:</b> {vbet}
-<i>{vreason}</i>
-
-🎁 <b>Don't miss:</b> {bonus}
-<i>{bcond}</i>
-
-💬 Tag a friend who bets on football.
 📡 @WC2026signals"""
 
 def evening():
     tomorrow_matches = get_tomorrows_matches()
     next_matches = get_next_matches(3)
-    bonus, bcond = random.choice(BONUSES)
-
-    acca_teams = random.sample(list(TEAM_TIPS.keys()), 3)
-    acca_lines = ""
-    for team in acca_teams:
-        market, _ = TEAM_TIPS[team]
-        acca_lines += f"• {team} — {market}\n"
+    fact = random.choice(TOURNAMENT_FACTS)
 
     if tomorrow_matches:
         preview_lines = ""
         for m in tomorrow_matches:
-            tip_market, tip_reason = TEAM_TIPS.get(m["home"], ("Home Win", "Tactical edge expected"))
+            analysis = TEAM_ANALYSIS.get(m["home"], {})
             preview_lines += f"⚽ <b>{m['home']} vs {m['away']}</b> · {m['time']} UTC\n"
-            preview_lines += f"📌 Pick: <b>{tip_market}</b> — {tip_reason}\n\n"
+            preview_lines += f"📌 <b>{analysis.get('tip', 'Home Win')}</b> — {analysis.get('reason', '')}\n"
+            preview_lines += f"📊 {analysis.get('stat', '')}\n\n"
 
-        return f"""🌙 <b>TOMORROW'S PREVIEW & PICKS</b>
+        return f"""🌙 <b>TOMORROW'S PREVIEW</b>
 
-{preview_lines}🔗 <b>Tonight's Accumulator:</b>
-{acca_lines}
-⚠️ Always bet responsibly. Accas are high risk / high reward.
+{preview_lines}🧠 <b>Tournament insight:</b>
+{fact}
 
-🎁 <b>Boost your bankroll:</b> {bonus}
-<i>{bcond}</i>
-
-💬 Share with your betting crew.
 📡 @WC2026signals"""
 
     else:
         next_lines = ""
         for m in next_matches:
-            next_lines += f"• <b>{m['home']} vs {m['away']}</b> — {m['date']}\n"
+            analysis = TEAM_ANALYSIS.get(m["home"], {})
+            next_lines += f"⚽ <b>{m['home']} vs {m['away']}</b> — {m['date']}\n"
+            next_lines += f"📌 {analysis.get('tip', 'Home Win')} · {analysis.get('key_player', '')}\n\n"
 
-        return f"""🌙 <b>EVENING PREVIEW</b>
+        return f"""🌙 <b>WC2026 EVENING PREVIEW</b>
 
-📅 <b>Matches Coming Up:</b>
-{next_lines}
-🔗 <b>Accumulator Idea:</b>
-{acca_lines}
-⚠️ Bet responsibly. Past performance ≠ future results.
+📅 <b>Coming up:</b>
+{next_lines}🧠 <b>Tournament fact:</b>
+{fact}
 
-🎁 {bonus}
-<i>{bcond}</i>
-
-💬 Know someone who loves football betting? Send them this channel.
 📡 @WC2026signals"""
 
 def main():
