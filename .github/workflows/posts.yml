@@ -2,51 +2,45 @@ name: Crypto Alpha Feed — Auto Posts
 
 on:
   schedule:
-    - cron: "0 6 * * *"    # 8am Israel (UTC+2)
-    - cron: "0 11 * * *"   # 1pm Israel
-    - cron: "0 17 * * *"   # 7pm Israel
-    - cron: "0 3 * * *"    # news 5am Israel
-    - cron: "0 8 * * *"    # news 10am Israel
-    - cron: "0 13 * * *"   # news 3pm Israel
-    - cron: "0 18 * * *"   # news 8pm Israel
-    - cron: "0 23 * * *"   # news 1am Israel
+    - cron: "0 6 * * *"    # 8am Israel (UTC+2) — morning post
+    - cron: "0 11 * * *"   # 1pm Israel — midday post
+    - cron: "0 17 * * *"   # 7pm Israel — evening post
+    - cron: "0 5 * * *"    # news batch 1
+    - cron: "0 10 * * *"   # news batch 2
+    - cron: "0 15 * * *"   # news batch 3
+    - cron: "0 20 * * *"   # news batch 4
+    - cron: "0 23 * * *"   # news batch 5
   workflow_dispatch:
 
 jobs:
   post:
     runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - run: pip install requests feedparser anthropic -q
 
-      - name: Install dependencies
-        run: pip install requests feedparser anthropic
-
-      - name: Run morning post
+      - name: Morning post
         if: github.event.schedule == '0 6 * * *'
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python post.py morning
 
-      - name: Run midday post
+      - name: Midday post
         if: github.event.schedule == '0 11 * * *'
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python post.py midday
 
-      - name: Run evening post
+      - name: Evening post
         if: github.event.schedule == '0 17 * * *'
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: python post.py evening
 
-      - name: Run news
-        if: contains(fromJSON('["0 3 * * *","0 8 * * *","0 13 * * *","0 18 * * *","0 23 * * *"]'), github.event.schedule)
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Crypto news
+        if: contains(fromJSON('["0 5 * * *","0 10 * * *","0 15 * * *","0 20 * * *","0 23 * * *"]'), github.event.schedule)
         run: python news.py
+
+      - name: WC2026 news
+        if: contains(fromJSON('["0 5 * * *","0 10 * * *","0 15 * * *","0 20 * * *","0 23 * * *"]'), github.event.schedule)
+        run: python wc_news.py
