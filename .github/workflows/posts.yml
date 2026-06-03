@@ -1,0 +1,52 @@
+name: Crypto Alpha Feed — Auto Posts
+
+on:
+  schedule:
+    - cron: "0 6 * * *"    # 8am Israel (UTC+2)
+    - cron: "0 11 * * *"   # 1pm Israel
+    - cron: "0 17 * * *"   # 7pm Israel
+    - cron: "0 3 * * *"    # news 5am Israel
+    - cron: "0 8 * * *"    # news 10am Israel
+    - cron: "0 13 * * *"   # news 3pm Israel
+    - cron: "0 18 * * *"   # news 8pm Israel
+    - cron: "0 23 * * *"   # news 1am Israel
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests feedparser anthropic
+
+      - name: Run morning post
+        if: github.event.schedule == '0 6 * * *'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python post.py morning
+
+      - name: Run midday post
+        if: github.event.schedule == '0 11 * * *'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python post.py midday
+
+      - name: Run evening post
+        if: github.event.schedule == '0 17 * * *'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python post.py evening
+
+      - name: Run news
+        if: contains(fromJSON('["0 3 * * *","0 8 * * *","0 13 * * *","0 18 * * *","0 23 * * *"]'), github.event.schedule)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python news.py
