@@ -183,13 +183,11 @@ def format_post(entry, source):
     badge = sentiment_badge(sentiment)
 
     caption = (
-        f"{t_emoji} <b>{title}</b>\n"
-        f"{'─' * 28}\n"
+        f"{t_emoji} <b>{title}</b>\n\n"
         f"{summary}\n\n"
         f"Sentiment: {badge}\n\n"
         f"🔗 <a href='{link}'>Read full article</a>\n\n"
         f"{s_emoji} {source}  •  🕐 {now}\n"
-        f"━━━━━━━━━━━━━━\n"
         f"📡 <b>Crypto Alpha Feed</b> — @crypto_alphafeed"
     )
     return caption
