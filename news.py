@@ -28,7 +28,7 @@ def load_env():
 ENV = load_env()
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ENV.get("TELEGRAM_BOT_TOKEN", "")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY") or ENV.get("ANTHROPIC_API_KEY", "")
-CHANNEL = "-1002481155935"
+CHANNELS = ["-1002481155935", "-1001652015415"]  # Crypto Alpha Feed + Crypto News AI
 API = f"https://api.telegram.org/bot{TOKEN}"
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "news.db")
 
@@ -136,12 +136,13 @@ def sentiment_badge(sentiment):
     return {"BULLISH": "🟢 Bullish", "BEARISH": "🔴 Bearish", "NEUTRAL": "⚪ Neutral"}.get(sentiment, "⚪ Neutral")
 
 def send_text(text):
-    requests.post(f"{API}/sendMessage", json={
-        "chat_id": CHANNEL,
-        "text": text,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": False
-    })
+    for channel in CHANNELS:
+        requests.post(f"{API}/sendMessage", json={
+            "chat_id": channel,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": False
+        })
 
 def generate_fallback_image(title):
     try:
@@ -196,25 +197,30 @@ def generate_fallback_image(title):
         return None
 
 def send_with_image(image_url, caption):
-    try:
-        # Local file (generated image)
-        if image_url and not image_url.startswith("http"):
-            with open(image_url, 'rb') as f:
-                r = requests.post(f"{API}/sendPhoto",
-                    data={"chat_id": CHANNEL, "caption": caption, "parse_mode": "HTML"},
-                    files={"photo": f}
-                )
-            import os; os.unlink(image_url)
-        else:
-            r = requests.post(f"{API}/sendPhoto", json={
-                "chat_id": CHANNEL, "photo": image_url,
-                "caption": caption, "parse_mode": "HTML"
-            })
-        if not r.json().get("ok"):
-            send_text(caption)
-    except Exception as e:
-        print(f"send_with_image error: {e}")
-        send_text(caption)
+    for channel in CHANNELS:
+        try:
+            if image_url and not image_url.startswith("http"):
+                with open(image_url, 'rb') as f:
+                    r = requests.post(f"{API}/sendPhoto",
+                        data={"chat_id": channel, "caption": caption, "parse_mode": "HTML"},
+                        files={"photo": f}
+                    )
+            else:
+                r = requests.post(f"{API}/sendPhoto", json={
+                    "chat_id": channel, "photo": image_url,
+                    "caption": caption, "parse_mode": "HTML"
+                })
+            if not r.json().get("ok"):
+                requests.post(f"{API}/sendMessage", json={
+                    "chat_id": channel, "text": caption, "parse_mode": "HTML"
+                })
+        except Exception as e:
+            print(f"send_with_image error on {channel}: {e}")
+    # Clean up local file once after sending to all channels
+    if image_url and not image_url.startswith("http"):
+        import os
+        try: os.unlink(image_url)
+        except: pass
 
 SOURCE_EMOJI = {
     "cointelegraph": "🟡",
