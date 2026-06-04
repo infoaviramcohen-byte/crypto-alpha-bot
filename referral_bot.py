@@ -170,7 +170,7 @@ def run():
                 process_update(update)
         except Exception as e:
             print(f"Error: {e}")
-            time.sleep(5)
+            time.sleep(15)
 
 if __name__ == "__main__":
     run()

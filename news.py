@@ -5,6 +5,19 @@ from datetime import datetime, timezone
 
 def load_env():
     env = {}
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if not os.path.exists(env_path):
+        return env
+    try:
+        with open(env_path) as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    env[k] = v.strip('"')
+    except:
+        pass
+    return env
+    env = {}
     with open("/Users/aviram/tg-crypto-bot/.env") as f:
         for line in f:
             if "=" in line:
