@@ -296,7 +296,7 @@ def run():
                 mark_posted(link)
                 posted_count += 1
 
-                if posted_count >= 2:
+                if posted_count >= 1:
                     print(f"Posted {posted_count} news items.")
                     return
 

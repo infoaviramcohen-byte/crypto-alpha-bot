@@ -166,7 +166,7 @@ def run():
                     send_text(caption)
                 mark_posted(link)
                 posted_count += 1
-                if posted_count >= 2:
+                if posted_count >= 1:
                     print(f"Posted {posted_count} WC news items.")
                     return
         except Exception as e:
