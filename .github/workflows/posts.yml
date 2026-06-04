@@ -2,11 +2,8 @@ name: Crypto Alpha Feed — Auto Posts
 
 on:
   schedule:
-    - cron: "0 6 * * *"    # 8am Israel (UTC+2) — morning post
-    - cron: "0 11 * * *"   # 1pm Israel — midday post
-    - cron: "0 17 * * *"   # 7pm Israel — evening post
     - cron: "0 5 * * *"    # news batch 1
-    - cron: "0 10 * * *"   # news batch 2
+    - cron: "0 10 * * *"   # news batch 2 + attention markets
     - cron: "0 15 * * *"   # news batch 3
     - cron: "0 20 * * *"   # news batch 4
     - cron: "0 23 * * *"   # news batch 5
@@ -25,22 +22,12 @@ jobs:
           python-version: "3.11"
       - run: pip install requests feedparser anthropic -q
 
-      - name: Morning post
-        if: github.event.schedule == '0 6 * * *'
-        run: python post.py morning
-
-      - name: Midday post
-        if: github.event.schedule == '0 11 * * *'
-        run: python post.py midday
-
-      - name: Evening post
-        if: github.event.schedule == '0 17 * * *'
-        run: python post.py evening
-
       - name: Crypto news
-        if: contains(fromJSON('["0 5 * * *","0 10 * * *","0 15 * * *","0 20 * * *","0 23 * * *"]'), github.event.schedule)
         run: python news.py
 
       - name: WC2026 news
-        if: contains(fromJSON('["0 5 * * *","0 10 * * *","0 15 * * *","0 20 * * *","0 23 * * *"]'), github.event.schedule)
         run: python wc_news.py
+
+      - name: Attention Markets
+        if: github.event.schedule == '0 10 * * *'
+        run: python attention_markets.py
