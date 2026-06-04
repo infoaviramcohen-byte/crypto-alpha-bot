@@ -143,17 +143,77 @@ def send_text(text):
         "disable_web_page_preview": False
     })
 
+def generate_fallback_image(title):
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import textwrap, tempfile
+
+        w, h = 1280, 720
+        img = Image.new('RGB', (w, h), (10, 10, 15))
+        draw = ImageDraw.Draw(img)
+
+        # Dark gradient overlay
+        for y in range(h):
+            alpha = int(15 + (y / h) * 20)
+            draw.line([(0, y), (w, y)], fill=(10, alpha, 20))
+
+        # Green accent bar
+        draw.rectangle([0, 0, 6, h], fill=(20, 241, 149))
+
+        # Grid lines
+        for x in range(0, w, 80):
+            draw.line([(x, 0), (x, h)], fill=(255, 255, 255, 8))
+        for y in range(0, h, 80):
+            draw.line([(0, y), (w, y)], fill=(255, 255, 255, 8))
+
+        # Channel label
+        try:
+            font_big = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 52)
+            font_med = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 36)
+            font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 28)
+        except:
+            font_big = font_med = font_small = ImageFont.load_default()
+
+        draw.text((40, 40), "CRYPTO ALPHA FEED", font=font_small, fill=(20, 241, 149))
+
+        # Title wrapped
+        wrapped = textwrap.wrap(title, width=38)[:4]
+        y_text = 160
+        for line in wrapped:
+            draw.text((40, y_text), line, font=font_big, fill=(232, 232, 240))
+            y_text += 70
+
+        # Bottom bar
+        draw.rectangle([0, h-60, w, h], fill=(15, 15, 25))
+        draw.text((40, h-42), "@crypto_alphafeed  •  cryptoalpha.feed", font=font_small, fill=(107, 107, 128))
+
+        # Save to temp file
+        tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+        img.save(tmp.name, 'PNG')
+        return tmp.name
+    except Exception as e:
+        print(f"Image gen error: {e}")
+        return None
+
 def send_with_image(image_url, caption):
     try:
-        r = requests.post(f"{API}/sendPhoto", json={
-            "chat_id": CHANNEL,
-            "photo": image_url,
-            "caption": caption,
-            "parse_mode": "HTML"
-        })
+        # Local file (generated image)
+        if image_url and not image_url.startswith("http"):
+            with open(image_url, 'rb') as f:
+                r = requests.post(f"{API}/sendPhoto",
+                    data={"chat_id": CHANNEL, "caption": caption, "parse_mode": "HTML"},
+                    files={"photo": f}
+                )
+            import os; os.unlink(image_url)
+        else:
+            r = requests.post(f"{API}/sendPhoto", json={
+                "chat_id": CHANNEL, "photo": image_url,
+                "caption": caption, "parse_mode": "HTML"
+            })
         if not r.json().get("ok"):
             send_text(caption)
-    except:
+    except Exception as e:
+        print(f"send_with_image error: {e}")
         send_text(caption)
 
 SOURCE_EMOJI = {
@@ -225,13 +285,14 @@ def run():
                     continue
 
                 image = extract_image(entry)
-                caption = format_post(entry, source)
+                if not image:
+                    image = generate_fallback_image(title)
 
+                caption = format_post(entry, source)
                 if image:
                     send_with_image(image, caption)
                 else:
                     send_text(caption)
-
                 mark_posted(link)
                 posted_count += 1
 
