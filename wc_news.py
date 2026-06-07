@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import feedparser, requests, sqlite3, os, re
+import anthropic
 from datetime import datetime, timezone
 
 def load_env():
@@ -29,6 +30,7 @@ def load_env():
 
 ENV = load_env()
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ENV.get("TELEGRAM_BOT_TOKEN", "")
+ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY") or ENV.get("ANTHROPIC_API_KEY", "")
 CHANNEL = "-1003877748369"  # WC2026signals
 API = f"https://api.telegram.org/bot{TOKEN}"
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wc_news.db")
@@ -110,16 +112,72 @@ def topic_emoji(title):
         if team in t: return emoji
     return "⚽"
 
+TAG_BADGE = {
+    "BREAKING": "🔥 Breaking",
+    "TRANSFER": "🤝 Transfer",
+    "INJURY": "🤕 Injury News",
+    "SQUAD": "📋 Squad News",
+    "BETTING": "🎯 Betting Angle",
+    "MATCH": "⚽ Match",
+    "TOURNAMENT": "🏆 Tournament",
+}
+
+def tag_from_keywords(text):
+    t = text.lower()
+    if any(x in t for x in ["injury", "injured", "out", "doubt", "fitness", "ruled out"]): return "INJURY"
+    if any(x in t for x in ["transfer", "sign", "deal", "move", "joins", "loan"]): return "TRANSFER"
+    if any(x in t for x in ["odds", "bet", "tip", "predict", "favourite", "favorite", "value"]): return "BETTING"
+    if any(x in t for x in ["squad", "lineup", "call-up", "roster", "named", "selection"]): return "SQUAD"
+    if any(x in t for x in ["final", "semi", "quarter", "knockout", "group", "draw", "fixture"]): return "TOURNAMENT"
+    if any(x in t for x in ["win", "beat", "score", "goal", " vs ", " v "]): return "MATCH"
+    return "BREAKING"
+
+def tag_badge(tag):
+    return TAG_BADGE.get(tag, "🔥 Breaking")
+
+def ai_summary_and_tag(title, raw_summary):
+    if not ANTHROPIC_KEY or ANTHROPIC_KEY == "your_key_here":
+        return clean_text(raw_summary)[:280], tag_from_keywords(title + " " + raw_summary)
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=120,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"You are a World Cup 2026 football channel writer. Given this news:\n"
+                    f"Title: {title}\nSummary: {raw_summary[:500]}\n\n"
+                    f"Write exactly 2 punchy lines (max 180 chars total) that a football fan and bettor "
+                    f"would find valuable. No fluff. Then on a new line write only ONE word: "
+                    f"BREAKING, TRANSFER, INJURY, SQUAD, BETTING, MATCH, or TOURNAMENT."
+                )
+            }]
+        )
+        lines = msg.content[0].text.strip().split("\n")
+        tag = lines[-1].strip().upper()
+        summary = "\n".join(lines[:-1]).strip()
+        if tag not in TAG_BADGE:
+            tag = tag_from_keywords(title)
+        return summary, tag
+    except Exception as e:
+        print(f"AI error: {e}")
+        return clean_text(raw_summary)[:280], tag_from_keywords(title + " " + raw_summary)
+
 def format_post(entry, source):
     title = entry.get("title", "").strip()
     link = entry.get("link", "").strip()
-    summary = clean_text(entry.get("summary", ""))
+    raw = clean_text(entry.get("summary", ""))
     now = datetime.now(timezone.utc).strftime("%H:%M UTC")
     t_emoji = topic_emoji(title)
+
+    summary, tag = ai_summary_and_tag(title, raw)
+    badge = tag_badge(tag)
 
     return (
         f"{t_emoji} <b>{title}</b>\n\n"
         f"{summary}\n\n"
+        f"📌 {badge}\n\n"
         f"🔗 <a href='{link}'>Read full article</a>\n\n"
         f"🕐 {now}\n"
         f"━━━━━━━━━━━━━━\n"
