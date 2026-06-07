@@ -271,6 +271,93 @@ def format_post(entry, source):
     )
     return caption
 
+# ---- Fallback "Market Pulse" for slow-news runs ----
+PULSE_KEY = "__MARKET_PULSE__"
+PULSE_MIN_GAP_HOURS = 6
+
+def last_pulse_at():
+    conn = sqlite3.connect(DB)
+    row = conn.execute("SELECT posted_at FROM posted WHERE url=?", (PULSE_KEY,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    try:
+        return datetime.fromisoformat(row[0])
+    except Exception:
+        return None
+
+def mark_pulse():
+    conn = sqlite3.connect(DB)
+    conn.execute("INSERT OR REPLACE INTO posted (url, posted_at) VALUES (?,?)",
+                 (PULSE_KEY, datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+    conn.close()
+
+def build_pulse():
+    try:
+        p = requests.get(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": "bitcoin,ethereum,solana", "vs_currencies": "usd", "include_24hr_change": True},
+            timeout=10
+        ).json()
+    except Exception:
+        return None
+    if not p.get("bitcoin"):
+        return None
+
+    try:
+        fng = requests.get("https://api.alternative.me/fng/", timeout=10).json()["data"][0]
+        fv, fc = fng["value"], fng["value_classification"]
+    except Exception:
+        fv, fc = "?", "?"
+    fe = "😱" if (fv.isdigit() and int(fv) < 25) else "😨" if (fv.isdigit() and int(fv) < 45) \
+        else "😐" if (fv.isdigit() and int(fv) < 55) else "😊" if (fv.isdigit() and int(fv) < 75) else "🤑"
+
+    trend = ""
+    try:
+        coins = requests.get("https://api.coingecko.com/api/v3/search/trending", timeout=10).json().get("coins", [])[:5]
+        syms = [f"${c['item']['symbol'].upper()}" for c in coins]
+        if syms:
+            trend = "🔥 <b>Trending:</b> " + ", ".join(syms) + "\n\n"
+    except Exception:
+        pass
+
+    def row(name, key):
+        d = p.get(key, {})
+        val = d.get("usd", 0) or 0
+        ch = d.get("usd_24h_change", 0) or 0
+        vs = f"${val:,.0f}" if val >= 100 else f"${val:,.2f}"
+        return f"{'📈' if ch >= 0 else '📉'} {name}: {vs} ({ch:+.1f}%)"
+
+    today = datetime.now(timezone.utc).strftime("%b %d")
+    return (
+        f"📊 <b>MARKET PULSE — {today}</b>\n"
+        f"<i>Quiet on the news front — here's where the market stands:</i>\n"
+        f"━━━━━━━━━━━━━━\n\n"
+        f"{row('BTC','bitcoin')}\n"
+        f"{row('ETH','ethereum')}\n"
+        f"{row('SOL','solana')}\n\n"
+        f"{fe} <b>Fear &amp; Greed:</b> {fv}/100 — {fc}\n\n"
+        f"{trend}"
+        f"📡 <b>Crypto Alpha Feed</b> — @crypto_alphafeed"
+    )
+
+def post_fallback():
+    last = last_pulse_at()
+    if last:
+        hrs = (datetime.now(timezone.utc) - last).total_seconds() / 3600
+        if hrs < PULSE_MIN_GAP_HOURS:
+            print(f"No news; last Market Pulse {hrs:.1f}h ago (< {PULSE_MIN_GAP_HOURS}h) — posting nothing.")
+            return False
+    pulse = build_pulse()
+    if not pulse:
+        print("No news and pulse data unavailable — posting nothing.")
+        return False
+    send_text(pulse)
+    mark_pulse()
+    print("No fresh news — posted Market Pulse fallback.")
+    return True
+
 def run():
     init_db()
     posted_count = 0
@@ -309,7 +396,11 @@ def run():
         except Exception as e:
             print(f"Error fetching {feed_url}: {e}")
 
-    print(f"Posted {posted_count} news items.")
+    if posted_count == 0:
+        # No fresh news this run — post a Market Pulse instead, or stay quiet.
+        post_fallback()
+    else:
+        print(f"Posted {posted_count} news items.")
 
 if __name__ == "__main__":
     run()
