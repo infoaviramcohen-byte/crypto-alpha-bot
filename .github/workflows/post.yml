@@ -2,10 +2,11 @@ name: Crypto Alpha Daily
 
 on:
   schedule:
-    - cron: '0 9 * * *'      # Daily 12:00 Israel (peak time)
-    - cron: '0 14 * * 1-5'   # Mon–Fri 17:00 Israel (second post)
-    - cron: '0 7 * * 3,4'    # Wed & Thu extra — 10:00 Israel morning
+    - cron: '0 9 * * *'      # Daily 12:00 Israel — morning brief
+    - cron: '0 14 * * 1-5'   # Mon–Fri 17:00 Israel — afternoon post
     - cron: '0 19 * * 3,4'   # Wed & Thu extra — 22:00 Israel evening
+    # NOTE: removed the 07:00 Wed/Thu cron — it landed in the same "morning"
+    # bucket (hour < 11) as the 09:00 daily run, causing duplicate morning posts.
   workflow_dispatch:          # Manual trigger anytime
 
 jobs:
