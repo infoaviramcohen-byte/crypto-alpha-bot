@@ -1,0 +1,47 @@
+name: Crypto News AI — Daily Content Series
+
+on:
+  schedule:
+    - cron: "0 12 * * *"    # ☀️ Daily Brief    — 12:00 UTC (EU 13:00 / US 08:00)
+    - cron: "30 14 * * *"   # 🐋 Smart Money     — 14:30 UTC (EU 15:30 / US 09:30)
+    - cron: "0 17 * * *"    # 🔍 Narrative Radar — 17:00 UTC (EU 18:00 / US 12:00)
+    - cron: "30 19 * * *"   # 📚 Trader Tip      — 19:30 UTC (EU 20:30 / US 14:30)
+    - cron: "0 22 * * *"    # 🌙 Evening Wrap    — 22:00 UTC (EU 23:00 / US 17:00)
+  workflow_dispatch:
+    inputs:
+      which:
+        description: "Which post to run manually (brief / smart / radar / tip / wrap / all)"
+        default: "brief"
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests feedparser anthropic -q
+
+      - name: Daily Brief
+        if: github.event.schedule == '0 12 * * *' || github.event.inputs.which == 'brief' || github.event.inputs.which == 'all'
+        run: python content/daily_brief.py
+
+      - name: Smart Money
+        if: github.event.schedule == '30 14 * * *' || github.event.inputs.which == 'smart' || github.event.inputs.which == 'all'
+        run: python content/smart_money.py
+
+      - name: Narrative Radar
+        if: github.event.schedule == '0 17 * * *' || github.event.inputs.which == 'radar' || github.event.inputs.which == 'all'
+        run: python content/narrative_radar.py
+
+      - name: Trader Tip
+        if: github.event.schedule == '30 19 * * *' || github.event.inputs.which == 'tip' || github.event.inputs.which == 'all'
+        run: python content/trader_tip.py
+
+      - name: Evening Wrap
+        if: github.event.schedule == '0 22 * * *' || github.event.inputs.which == 'wrap' || github.event.inputs.which == 'all'
+        run: python content/evening_wrap.py
