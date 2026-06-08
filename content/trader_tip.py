@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import requests, os
+import requests, os, tempfile
 from datetime import datetime, timezone
+from visuals import render_card, WHITE, GOLD, GREEN, wrap_lines
 
 def load_env():
     env={}
@@ -16,49 +17,46 @@ ANTHROPIC_KEY=os.environ.get("ANTHROPIC_API_KEY") or ENV.get("ANTHROPIC_API_KEY"
 CHANNEL="-1001652015415"
 API=f"https://api.telegram.org/bot{TOKEN}"
 
-def send(text):
-    r=requests.post(f"{API}/sendMessage", json={"chat_id":CHANNEL,"text":text,"parse_mode":"HTML","disable_web_page_preview":True})
+def send_photo(path, caption):
+    with open(path,"rb") as f:
+        r=requests.post(f"{API}/sendPhoto",data={"chat_id":CHANNEL,"caption":caption,"parse_mode":"HTML"},files={"photo":f})
     print("sent" if r.json().get("ok") else "ERR: "+str(r.json().get("description")))
 
-# Rotate topic by day of year so tips don't repeat back-to-back
 TOPICS=[
- "spotting a honeypot / rug pull before you buy",
- "why you should use a dedicated burner wallet for trading",
- "how priority fees & MEV protection affect your fills on Solana",
- "reading on-chain smart-money flows",
- "managing risk: position sizing for memecoins",
- "how to verify a token contract is safe",
- "the danger of fake Telegram bot clones (and how to avoid them)",
- "taking profits: why exits matter more than entries",
- "how trading bot fees actually work (and how to pay less)",
- "avoiding FOMO: waiting for confirmation vs chasing pumps",
+ ("Spot a rug before you buy","spotting a honeypot / rug pull before you buy"),
+ ("Use a burner wallet","why you should use a dedicated burner wallet for trading"),
+ ("Beat slow fills","how priority fees & MEV protection affect your fills on Solana"),
+ ("Follow the smart money","reading on-chain smart-money flows"),
+ ("Size your bets","position sizing & risk management for memecoins"),
+ ("Verify the contract","how to verify a token contract is safe"),
+ ("Avoid fake bots","the danger of fake Telegram bot clones and how to avoid them"),
+ ("Exits > entries","why taking profits matters more than your entry"),
+ ("Pay less in fees","how trading-bot fees work and how to pay less"),
+ ("Beat FOMO","waiting for confirmation vs chasing pumps"),
 ]
 
 def ai_tip(topic):
-    base=f"💡 Trader tip: {topic}. Always do your own research and protect your capital."
+    base=f"{topic}. Always do your own research and protect your capital."
     if not ANTHROPIC_KEY: return base
     try:
         import anthropic
         c=anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-        m=c.messages.create(model="claude-haiku-4-5-20251001",max_tokens=160,
-            messages=[{"role":"user","content":(
-                f"You write a crypto trader-education channel. Topic: {topic}. "
-                f"Write a genuinely useful, concrete tip in 3-4 short lines (max 320 chars). "
-                f"Practical and specific, no fluff, no hype. Don't add a disclaimer.")}])
+        m=c.messages.create(model="claude-haiku-4-5-20251001",max_tokens=150,
+            messages=[{"role":"user","content":(f"Crypto trader-education channel. Topic: {topic}. "
+            f"Write a genuinely useful, concrete tip in 2-3 short sentences (max 260 chars). Practical, no fluff, no disclaimer.")}])
         return m.content[0].text.strip()
     except Exception as e:
         print("AI err",e); return base
 
 def main():
     doy=datetime.now(timezone.utc).timetuple().tm_yday
-    topic=TOPICS[doy % len(TOPICS)]
+    short,topic=TOPICS[doy % len(TOPICS)]
     tip=ai_tip(topic)
-    send(f"""📚 <b>TRADER TIP OF THE DAY</b>
-━━━━━━━━━━━━━━
-
-{tip}
-
-🛡️ Stay sharp, stay safe.
-📡 @cryptonewsweb_3""")
+    lines=[("",None)]+wrap_lines(tip, 34, WHITE)
+    tmp=tempfile.NamedTemporaryFile(suffix=".png",delete=False).name
+    render_card(tmp,"TRADER TIP",short,lines,accent=GOLD)
+    cap=f"📚 <b>Trader Tip of the Day</b>\n\n{tip}\n\n🛡️ Stay sharp, stay safe.\n📡 @cryptonewsweb_3"
+    send_photo(tmp,cap)
+    os.unlink(tmp)
 
 if __name__=="__main__": main()
