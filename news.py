@@ -135,11 +135,18 @@ def sentiment_from_keywords(text):
 def sentiment_badge(sentiment):
     return {"BULLISH": "🟢 Bullish", "BEARISH": "🔴 Bearish", "NEUTRAL": "⚪ Neutral"}.get(sentiment, "⚪ Neutral")
 
+# Affiliate footer — TEST: appended only on Crypto News AI (-1001652015415) for now.
+AFF_FOOTER = {
+    "-1001652015415": "\n\n🤖 <a href=\"https://botarenasol.com/?utm_source=telegram&utm_medium=news_footer&utm_campaign=cryptonewsai\">Best Solana trading bots →</a>",
+}
+def aff_footer(channel):
+    return AFF_FOOTER.get(str(channel), "")
+
 def send_text(text):
     for channel in CHANNELS:
         requests.post(f"{API}/sendMessage", json={
             "chat_id": channel,
-            "text": text,
+            "text": text + aff_footer(channel),
             "parse_mode": "HTML",
             "disable_web_page_preview": False
         })
@@ -198,21 +205,22 @@ def generate_fallback_image(title):
 
 def send_with_image(image_url, caption):
     for channel in CHANNELS:
+        cap = caption + aff_footer(channel)
         try:
             if image_url and not image_url.startswith("http"):
                 with open(image_url, 'rb') as f:
                     r = requests.post(f"{API}/sendPhoto",
-                        data={"chat_id": channel, "caption": caption, "parse_mode": "HTML"},
+                        data={"chat_id": channel, "caption": cap, "parse_mode": "HTML"},
                         files={"photo": f}
                     )
             else:
                 r = requests.post(f"{API}/sendPhoto", json={
                     "chat_id": channel, "photo": image_url,
-                    "caption": caption, "parse_mode": "HTML"
+                    "caption": cap, "parse_mode": "HTML"
                 })
             if not r.json().get("ok"):
                 requests.post(f"{API}/sendMessage", json={
-                    "chat_id": channel, "text": caption, "parse_mode": "HTML"
+                    "chat_id": channel, "text": cap, "parse_mode": "HTML"
                 })
         except Exception as e:
             print(f"send_with_image error on {channel}: {e}")
