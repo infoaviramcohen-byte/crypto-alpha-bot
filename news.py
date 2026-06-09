@@ -28,7 +28,7 @@ def load_env():
 ENV = load_env()
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ENV.get("TELEGRAM_BOT_TOKEN", "")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY") or ENV.get("ANTHROPIC_API_KEY", "")
-CHANNELS = ["-1001652015415"]  # TEST: Crypto News AI only (restore Crypto Alpha Feed -1002481155935 after)
+CHANNELS = ["-1002481155935", "-1001652015415"]  # Crypto Alpha Feed + Crypto News AI
 API = f"https://api.telegram.org/bot{TOKEN}"
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "news.db")
 
@@ -137,7 +137,8 @@ def sentiment_badge(sentiment):
 
 # Affiliate footer — TEST: appended only on Crypto News AI (-1001652015415) for now.
 AFF_FOOTER = {
-    "-1001652015415": "\n\n🤖 <a href=\"https://botarenasol.com/?utm_source=telegram&utm_medium=news_footer&utm_campaign=best_solana_bots\">Best Solana trading bots →</a>",
+    "-1002481155935": "\n\n🤖 <a href=\"https://botarenasol.com/?utm_source=telegram&utm_medium=news_footer&utm_campaign=best_solana_bots&utm_content=crypto_alphafeed\">Best Solana trading bots →</a>",
+    "-1001652015415": "\n\n🤖 <a href=\"https://botarenasol.com/?utm_source=telegram&utm_medium=news_footer&utm_campaign=best_solana_bots&utm_content=cryptonewsai\">Best Solana trading bots →</a>",
 }
 def aff_footer(channel):
     return AFF_FOOTER.get(str(channel), "")
