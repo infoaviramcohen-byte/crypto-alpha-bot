@@ -2,7 +2,6 @@ name: Crypto News AI — Daily Content Series
 
 on:
   schedule:
-    - cron: "0 12 * * *"    # ☀️ Daily Brief    — 12:00 UTC (EU 13:00 / US 08:00)
     - cron: "30 14 * * *"   # 🐋 Smart Money     — 14:30 UTC (EU 15:30 / US 09:30)
     - cron: "0 17 * * *"    # 🔍 Narrative Radar — 17:00 UTC (EU 18:00 / US 12:00)
     - cron: "30 19 * * *"   # 📚 Trader Tip      — 19:30 UTC (EU 20:30 / US 14:30)
@@ -25,10 +24,6 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install requests feedparser anthropic pillow -q
-
-      - name: Daily Brief
-        if: github.event.schedule == '0 12 * * *' || github.event.inputs.which == 'brief' || github.event.inputs.which == 'all'
-        run: python content/daily_brief.py
 
       - name: Smart Money
         if: github.event.schedule == '30 14 * * *' || github.event.inputs.which == 'smart' || github.event.inputs.which == 'all'
