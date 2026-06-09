@@ -266,7 +266,7 @@ def format_post(entry, source):
         f"{summary}\n\n"
         f"Sentiment: {badge}\n\n"
         f"🔗 <a href='{link}'>Read full article</a>\n\n"
-        f"{s_emoji} {source}  •  🕐 {now}\n"
+        f"🕐 {now}\n"
         f"📡 <b>Crypto Alpha Feed</b> — @crypto_alphafeed"
     )
     return caption
