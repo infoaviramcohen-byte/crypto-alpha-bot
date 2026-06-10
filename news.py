@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import feedparser, requests, sqlite3, os, re
+import feedparser, requests, sqlite3, os, re, json, random
 import anthropic
 from datetime import datetime, timezone
 
@@ -135,21 +135,30 @@ def sentiment_from_keywords(text):
 def sentiment_badge(sentiment):
     return {"BULLISH": "🟢 Bullish", "BEARISH": "🔴 Bearish", "NEUTRAL": "⚪ Neutral"}.get(sentiment, "⚪ Neutral")
 
-# Affiliate footer — TEST: appended only on Crypto News AI (-1001652015415) for now.
-AFF_FOOTER = {
-    "-1002481155935": "\n\n🤖 <a href=\"https://botarenasol.com/?utm_source=telegram&utm_medium=news_footer&utm_campaign=best_solana_bots&utm_content=crypto_alphafeed\">Best Solana trading bots →</a>",
-    "-1001652015415": "\n\n🤖 <a href=\"https://botarenasol.com/?utm_source=telegram&utm_medium=news_footer&utm_campaign=best_solana_bots&utm_content=cryptonewsai\">Best Solana trading bots →</a>",
-}
-def aff_footer(channel):
-    return AFF_FOOTER.get(str(channel), "")
+# Rotating CTA buttons — A/B test which hook drives the most clicks (tracked via utm_content in GA4).
+CTA_BASE = "https://botarenasol.com/?utm_source=telegram&utm_medium=news_cta&utm_campaign=news_rotation&utm_content={content}#comparison"
+CTAS = [
+    ("🐋 Track Smart Money →", "cta_smartmoney"),
+    ("💸 Trade with 35% Cashback →", "cta_cashback"),
+    ("⚡ Don't Miss the Next Move →", "cta_fomo"),
+    ("🤖 Compare Top Solana Bots →", "cta_compare"),
+]
+CHAN_LABEL = {"-1002481155935": "alphafeed", "-1001652015415": "cryptonewsai"}
+
+def cta_markup(channel):
+    """Pick a random CTA and return an inline-button keyboard with a tracked URL."""
+    text, tag = random.choice(CTAS)
+    url = CTA_BASE.format(content=f"{tag}_{CHAN_LABEL.get(str(channel), 'x')}")
+    return {"inline_keyboard": [[{"text": text, "url": url}]]}
 
 def send_text(text):
     for channel in CHANNELS:
         requests.post(f"{API}/sendMessage", json={
             "chat_id": channel,
-            "text": text + aff_footer(channel),
+            "text": text,
             "parse_mode": "HTML",
-            "disable_web_page_preview": False
+            "disable_web_page_preview": False,
+            "reply_markup": cta_markup(channel)
         })
 
 def generate_fallback_image(title):
@@ -206,22 +215,24 @@ def generate_fallback_image(title):
 
 def send_with_image(image_url, caption):
     for channel in CHANNELS:
-        cap = caption + aff_footer(channel)
+        cap = caption
+        markup = cta_markup(channel)
         try:
             if image_url and not image_url.startswith("http"):
                 with open(image_url, 'rb') as f:
                     r = requests.post(f"{API}/sendPhoto",
-                        data={"chat_id": channel, "caption": cap, "parse_mode": "HTML"},
+                        data={"chat_id": channel, "caption": cap, "parse_mode": "HTML",
+                              "reply_markup": json.dumps(markup)},
                         files={"photo": f}
                     )
             else:
                 r = requests.post(f"{API}/sendPhoto", json={
                     "chat_id": channel, "photo": image_url,
-                    "caption": cap, "parse_mode": "HTML"
+                    "caption": cap, "parse_mode": "HTML", "reply_markup": markup
                 })
             if not r.json().get("ok"):
                 requests.post(f"{API}/sendMessage", json={
-                    "chat_id": channel, "text": cap, "parse_mode": "HTML"
+                    "chat_id": channel, "text": cap, "parse_mode": "HTML", "reply_markup": markup
                 })
         except Exception as e:
             print(f"send_with_image error on {channel}: {e}")
