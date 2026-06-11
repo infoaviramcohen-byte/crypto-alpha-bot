@@ -62,8 +62,19 @@ def mark_posted(url):
     conn.commit()
     conn.close()
 
+# Generic hub/roundup pages these feeds publish with no real article content — skip them.
+BLOCKLIST = [
+    "what happened in crypto today",
+    "need to know what happened in crypto",
+    "here is the latest news on daily trends",
+    "latest news on daily trends and events",
+    "price analysis week ahead",
+]
+
 def is_relevant(title, summary=""):
     text = (title + " " + summary).lower()
+    if any(b in text for b in BLOCKLIST):
+        return False
     return any(k in text for k in KEYWORDS)
 
 def extract_image(entry):
