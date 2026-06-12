@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import feedparser, requests, sqlite3, os, re, json, random
+import feedparser, requests, sqlite3, os, re, json, random, time
 import anthropic
 from datetime import datetime, timezone
 
@@ -76,6 +76,43 @@ def is_relevant(title, summary=""):
     if any(b in text for b in BLOCKLIST):
         return False
     return any(k in text for k in KEYWORDS)
+
+MAGNIFIC_API_KEY = os.environ.get("MAGNIFIC_API_KEY") or ENV.get("MAGNIFIC_API_KEY", "")
+MAGNIFIC_URL = "https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro-flash"
+
+def magnific_image(headline):
+    """Generate a custom branded news image via Magnific Nano Banana 2. Returns image URL or None."""
+    if not MAGNIFIC_API_KEY:
+        return None
+    prompt = (
+        f"Premium cinematic editorial illustration for a crypto news story about: {headline}. "
+        "Dark moody background, glossy high-end 3D finish, dramatic lighting, depth and glow. "
+        "Accent colors: Solana green and electric purple. Abstract finance, blockchain and crypto motifs. "
+        "Vertical 4:5 composition. No text, no words, no letters, no watermark, no logos."
+    )
+    H = {"x-magnific-api-key": MAGNIFIC_API_KEY, "Content-Type": "application/json"}
+    try:
+        r = requests.post(MAGNIFIC_URL, headers=H,
+                          json={"prompt": prompt[:3000], "aspect_ratio": "4:5", "resolution": "1K"},
+                          timeout=40)
+        task_id = (r.json().get("data") or {}).get("task_id")
+        if not task_id:
+            print("magnific: no task_id:", str(r.json())[:200]); return None
+        for _ in range(30):  # poll up to ~2 min
+            time.sleep(4)
+            d = requests.get(f"{MAGNIFIC_URL}/{task_id}", headers=H, timeout=30).json().get("data", {})
+            status = d.get("status")
+            if status == "COMPLETED":
+                gen = d.get("generated") or []
+                if not gen:
+                    return None
+                first = gen[0]
+                return first if isinstance(first, str) else (first.get("url") or first.get("image"))
+            if status == "FAILED":
+                print("magnific: task failed"); return None
+        print("magnific: timed out"); return None
+    except Exception as e:
+        print("magnific error:", e); return None
 
 def extract_image(entry):
     # Try media_content
@@ -296,8 +333,10 @@ def format_post(entry, source):
         f"{t_emoji} <b>{title}</b>\n\n"
         f"{summary}\n\n"
         f"Sentiment: {badge}\n\n"
-        f"📡 <b>Crypto Alpha Feed</b> — @crypto_alphafeed"
     )
+    if link:
+        caption += f"🔗 <a href=\"{link}\">Read the full story →</a>\n\n"
+    caption += f"📡 <b>Crypto Alpha Feed</b> — @crypto_alphafeed"
     return caption
 
 # ---- Fallback "Market Pulse" for slow-news runs ----
@@ -406,6 +445,7 @@ def run():
                 if not is_relevant(title, entry.get("summary", "")):
                     continue
 
+                # Use the source article's image; fall back to a local branded card.
                 image = extract_image(entry)
                 if not image:
                     image = generate_fallback_image(title)
