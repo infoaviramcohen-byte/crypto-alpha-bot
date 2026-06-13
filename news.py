@@ -47,8 +47,20 @@ KEYWORDS = [
 def init_db():
     conn = sqlite3.connect(DB)
     conn.execute("CREATE TABLE IF NOT EXISTS posted (url TEXT PRIMARY KEY, posted_at TEXT)")
+    conn.execute("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, val INTEGER)")
     conn.commit()
     conn.close()
+
+def next_cta_index():
+    """Round-robin counter persisted in the DB so CTAs cycle evenly across runs."""
+    conn = sqlite3.connect(DB)
+    conn.execute("CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, val INTEGER)")
+    row = conn.execute("SELECT val FROM kv WHERE key='cta_idx'").fetchone()
+    idx = row[0] if row else 0
+    conn.execute("INSERT OR REPLACE INTO kv (key, val) VALUES ('cta_idx', ?)", (idx + 1,))
+    conn.commit()
+    conn.close()
+    return idx
 
 def already_posted(url):
     conn = sqlite3.connect(DB)
@@ -194,8 +206,8 @@ CTAS = [
 CHAN_LABEL = {"-1002481155935": "alphafeed", "-1001652015415": "cryptonewsai"}
 
 def cta_markup(channel):
-    """Pick a random CTA and return an inline-button keyboard with a tracked URL."""
-    text, tag = random.choice(CTAS)
+    """Pick the next CTA in round-robin order and return an inline-button keyboard."""
+    text, tag = CTAS[next_cta_index() % len(CTAS)]
     url = CTA_BASE.format(content=f"{tag}_{CHAN_LABEL.get(str(channel), 'x')}")
     return {"inline_keyboard": [[{"text": text, "url": url}]]}
 
