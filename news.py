@@ -180,6 +180,32 @@ def extract_image(entry):
         match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', entry.get("summary", ""))
         if match:
             return match.group(1)
+    # Try content:encoded HTML
+    try:
+        for c in (entry.get("content") or []):
+            m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', c.get("value", ""))
+            if m:
+                return m.group(1)
+    except Exception:
+        pass
+    return None
+
+def fetch_og_image(url):
+    """Last resort: pull the article page's og:image (the hero image)."""
+    if not url or not url.startswith("http"):
+        return None
+    try:
+        html = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}).text
+        for pat in [
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+            r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)',
+        ]:
+            m = re.search(pat, html, re.I)
+            if m and m.group(1).startswith("http"):
+                return m.group(1)
+    except Exception as e:
+        print("og:image fetch error:", e)
     return None
 
 def clean_summary(text):
@@ -507,7 +533,8 @@ def run():
     sc, entry, source, link, title = candidates[0]
     print(f"Top story (score {sc}): {title[:90]}")
 
-    image = extract_image(entry) or generate_fallback_image(title)
+    # Always attach a real news image: RSS image -> article og:image -> branded card
+    image = extract_image(entry) or fetch_og_image(link) or generate_fallback_image(title)
     caption = format_post(entry, source)
     if image:
         send_with_image(image, caption)
