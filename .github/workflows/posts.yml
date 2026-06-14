@@ -3,9 +3,10 @@ name: Crypto Alpha Feed — Auto Posts
 on:
   schedule:
     # Max 3 posts/day to @crypto_alphafeed — morning, midday, evening (UTC).
-    - cron: "0 7 * * *"    # ~10:00 IDT / 03:00 ET — morning
-    - cron: "0 13 * * *"   # ~16:00 IDT / 09:00 ET — midday
-    - cron: "0 19 * * *"   # ~22:00 IDT / 15:00 ET — evening
+    # Tuned to peak click hours (US morning/midday + EU afternoon + US evening)
+    - cron: "0 14 * * *"   # 14:00 UTC — peak (17:00 IDT / 10:00 ET)
+    - cron: "0 17 * * *"   # 17:00 UTC — #1 peak (20:00 IDT / 13:00 ET)
+    - cron: "0 22 * * *"   # 22:00 UTC — US evening bump (01:00 IDT / 18:00 ET)
   workflow_dispatch:
 
 jobs:
