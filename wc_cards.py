@@ -140,15 +140,20 @@ def ai_predict(home, away):
 
 def init_db():
     conn = sqlite3.connect(DB)
-    conn.execute("CREATE TABLE IF NOT EXISTS posted (event_id TEXT PRIMARY KEY, at TEXT)")
+    conn.execute("""CREATE TABLE IF NOT EXISTS predictions (
+        event_id TEXT PRIMARY KEY, home TEXT, away TEXT, pick TEXT, value TEXT,
+        posted_at TEXT, graded INTEGER DEFAULT 0, won INTEGER, results_posted INTEGER DEFAULT 0)""")
     conn.commit(); conn.close()
 
 def already(eid):
-    conn = sqlite3.connect(DB); row = conn.execute("SELECT 1 FROM posted WHERE event_id=?", (eid,)).fetchone(); conn.close()
+    conn = sqlite3.connect(DB); row = conn.execute("SELECT 1 FROM predictions WHERE event_id=?", (eid,)).fetchone(); conn.close()
     return row is not None
 
-def mark(eid):
-    conn = sqlite3.connect(DB); conn.execute("INSERT OR REPLACE INTO posted (event_id, at) VALUES (?,?)", (eid, datetime.datetime.now(datetime.timezone.utc).isoformat())); conn.commit(); conn.close()
+def save_prediction(eid, home, away, pick, value):
+    conn = sqlite3.connect(DB)
+    conn.execute("INSERT OR REPLACE INTO predictions (event_id, home, away, pick, value, posted_at, graded) VALUES (?,?,?,?,?,?,0)",
+                 (eid, home, away, pick, value, datetime.datetime.now(datetime.timezone.utc).isoformat()))
+    conn.commit(); conn.close()
 
 def post_card(path, caption):
     with open(path, "rb") as f:
@@ -189,7 +194,8 @@ def run():
                f"📊 Model lean: <b>{pred.get('pick','')}</b> ({pred.get('confidence',55)}%)\n{reasons}\n\n"
                f"🎯 Value: <b>{pred.get('value','')}</b>\n\n18+ · Bet responsibly · Not advice\n📡 @WC2026signals")
         if post_card(tmp, cap):
-            mark(eid); posted += 1
+            save_prediction(eid, home, away, pred.get("pick", f"{home} to win"), pred.get("value", ""))
+            posted += 1
             print("posted", home, "vs", away)
         try: os.unlink(tmp)
         except: pass

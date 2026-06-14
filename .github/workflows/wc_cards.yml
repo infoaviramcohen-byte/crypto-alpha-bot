@@ -28,5 +28,8 @@ jobs:
 
       - run: pip install requests anthropic pillow -q
 
-      - name: Post WC AI betting cards
+      - name: Grade & post yesterday's results (track record)
+        run: python wc_results.py
+
+      - name: Post today's WC AI betting cards
         run: python wc_cards.py
