@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import feedparser, requests, sqlite3, os, re, json, random, time
+import feedparser, requests, sqlite3, os, re, json, random, time, calendar
 import anthropic
 from datetime import datetime, timezone
 
@@ -37,6 +37,10 @@ FEEDS = [
     "https://coindesk.com/arc/outboundfeeds/rss/",
     "https://decrypt.co/feed",
     "https://theblock.co/rss.xml",
+    "https://cryptoslate.com/feed/",
+    "https://ambcrypto.com/feed/",
+    "https://beincrypto.com/feed/",
+    "https://u.today/rss",
 ]
 
 KEYWORDS = [
@@ -88,6 +92,35 @@ def is_relevant(title, summary=""):
     if any(b in text for b in BLOCKLIST):
         return False
     return any(k in text for k in KEYWORDS)
+
+# ---- Relevance scoring: pick the BEST story from the pool (audience = Solana traders) ----
+TOPIC_HIGH = ["solana", " sol ", "$sol", "memecoin", "meme coin", "pump.fun", "pumpfun",
+              "trading bot", "smart money", "sniper", "bonk", "jupiter", "jito", "raydium", "wif"]
+TOPIC_MID = ["bitcoin", "btc", "ethereum", " eth ", "etf"]
+IMPACT_REG = ["etf", " sec ", "regulation", "lawsuit", "approval", "approve", "ban "]
+IMPACT_HACK = ["hack", "exploit", "rug", "scam", "breach", "drain", "stolen"]
+IMPACT_PRICE = ["all-time high", "ath", "record", "billion", "surge", "crash", "rally", "plunge", "soar"]
+IMPACT_LAUNCH = ["listing", "partnership", "launch", "upgrade", "integration", "mainnet"]
+TIER1 = ["cointelegraph", "coindesk", "the block", "decrypt"]
+
+def score_article(title, summary, source, age_hours):
+    t = (" " + (title + " " + summary).lower() + " ")
+    s = (source or "").lower()
+    score = 0
+    if any(k in t for k in TOPIC_HIGH): score += 10
+    elif any(k in t for k in TOPIC_MID): score += 5
+    else: score += 1
+    if any(k in t for k in IMPACT_REG): score += 6
+    if any(k in t for k in IMPACT_HACK): score += 6
+    if any(k in t for k in IMPACT_PRICE): score += 4
+    if any(k in t for k in IMPACT_LAUNCH): score += 3
+    score += 3 if any(k in s for k in TIER1) else 1
+    if age_hours is not None:
+        if age_hours <= 3: score += 4
+        elif age_hours <= 8: score += 2
+        elif age_hours <= 24: score += 1
+        else: score -= 2
+    return score
 
 MAGNIFIC_API_KEY = os.environ.get("MAGNIFIC_API_KEY") or ENV.get("MAGNIFIC_API_KEY", "")
 MAGNIFIC_URL = "https://api.magnific.com/v1/ai/text-to-image/nano-banana-pro-flash"
@@ -440,48 +473,49 @@ def post_fallback():
 
 def run():
     init_db()
-    posted_count = 0
 
+    # 1) Collect every fresh, relevant, unposted article across all feeds
+    candidates = []
     for feed_url in FEEDS:
         try:
             feed = feedparser.parse(feed_url)
             source = feed.feed.get("title", feed_url)
-
-            for entry in feed.entries[:10]:
+            for entry in feed.entries[:12]:
                 link = entry.get("link", "")
                 title = entry.get("title", "")
-
                 if not link or already_posted(link):
                     continue
-
                 if not is_relevant(title, entry.get("summary", "")):
                     continue
-
-                # Use the source article's image; fall back to a local branded card.
-                image = extract_image(entry)
-                if not image:
-                    image = generate_fallback_image(title)
-
-                caption = format_post(entry, source)
-                if image:
-                    send_with_image(image, caption)
-                else:
-                    send_text(caption)
-                mark_posted(link)
-                posted_count += 1
-
-                if posted_count >= 1:
-                    print(f"Posted {posted_count} news items.")
-                    return
-
+                age = None
+                pp = entry.get("published_parsed") or entry.get("updated_parsed")
+                if pp:
+                    pub = datetime.fromtimestamp(calendar.timegm(pp), tz=timezone.utc)
+                    age = (datetime.now(timezone.utc) - pub).total_seconds() / 3600
+                sc = score_article(title, entry.get("summary", ""), source, age)
+                candidates.append((sc, entry, source, link, title))
         except Exception as e:
             print(f"Error fetching {feed_url}: {e}")
 
-    if posted_count == 0:
-        # No fresh news this run — post a Market Pulse instead, or stay quiet.
+    # 2) No news -> Market Pulse fallback
+    if not candidates:
         post_fallback()
+        return
+
+    # 3) Rank by relevance score, post the single best story
+    candidates.sort(key=lambda c: c[0], reverse=True)
+    sc, entry, source, link, title = candidates[0]
+    print(f"Top story (score {sc}): {title[:90]}")
+
+    image = extract_image(entry) or generate_fallback_image(title)
+    caption = format_post(entry, source)
+    if image:
+        send_with_image(image, caption)
     else:
-        print(f"Posted {posted_count} news items.")
+        send_text(caption)
+    mark_posted(link)
+    print("Posted 1 news item (top-ranked of "
+          f"{len(candidates)} candidates).")
 
 if __name__ == "__main__":
     run()
