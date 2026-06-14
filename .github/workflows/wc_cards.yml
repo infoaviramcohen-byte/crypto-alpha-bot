@@ -1,0 +1,32 @@
+name: WC2026 AI Betting Cards
+
+on:
+  schedule:
+    - cron: "0 9 * * *"   # daily 09:00 UTC — lead time before the day's matches
+  workflow_dispatch:
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    env:
+      WC_BOT_TOKEN: ${{ secrets.WC_BOT_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Persist the "already posted" DB so the same match isn't carded twice.
+      - name: Restore dedup database
+        uses: actions/cache@v4
+        with:
+          path: wc_cards.db
+          key: wc-cards-db-${{ github.run_id }}
+          restore-keys: |
+            wc-cards-db-
+
+      - run: pip install requests anthropic pillow -q
+
+      - name: Post WC AI betting cards
+        run: python wc_cards.py

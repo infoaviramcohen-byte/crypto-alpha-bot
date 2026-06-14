@@ -3,3 +3,4 @@
 *.log
 *.pid
 __pycache__/
+wc_cards.db
