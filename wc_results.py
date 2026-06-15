@@ -2,6 +2,62 @@
 """Grade finished WC predictions and post a results / track-record update to
 @WC2026signals. Runs daily before the new predictions go out."""
 import os, sqlite3, datetime, requests
+from PIL import Image, ImageDraw, ImageFont
+
+W, H = 1080, 1350
+GREEN = (34, 222, 128); GOLD = (255, 200, 60); WHITE = (245, 247, 250); GREY = (150, 158, 168); RED = (255, 86, 86); DARK = (8, 12, 10)
+
+def _font(sz, bold=True):
+    for p in ["/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]:
+        if os.path.exists(p):
+            try: return ImageFont.truetype(p, sz)
+            except: pass
+    return ImageFont.load_default()
+
+def render_results_card(out, items, w, l, rate, day):
+    img = Image.new("RGB", (W, H), DARK); d = ImageDraw.Draw(img, "RGBA")
+    for y in range(H):
+        t = y / H; d.line([(0, y), (W, y)], fill=(int(8 + 6 * t), int(14 + 11 * t), int(10 + 7 * t)))
+    def glow(cx, cy, r, c, s=13):
+        for i in range(r, 0, -7): d.ellipse([cx - i, cy - i, cx + i, cy + i], fill=(c[0], c[1], c[2], max(0, s - int(s * (i / r)))))
+    glow(160, 150, 460, GREEN, 10); glow(940, 1190, 520, GOLD, 11)
+    def ct(txt, f, y, fill, cx=W / 2): d.text((cx - d.textlength(txt, font=f) / 2, y), txt, font=f, fill=fill)
+    ct("FOOTBALL  ·  AI BETTING SIGNALS", _font(30), 60, WHITE)
+    d.line([(80, 110), (W - 80, 110)], fill=(40, 52, 46), width=2)
+    tag = f"RESULTS · {day}"
+    tf = _font(30); tw = d.textlength(tag, font=tf)
+    d.rounded_rectangle([W / 2 - tw / 2 - 26, 150, W / 2 + tw / 2 + 26, 202], radius=26, fill=(255, 200, 60, 45), outline=GOLD, width=2)
+    ct(tag, tf, 160, GOLD)
+    # rows
+    y = 270
+    for pick, home, away, hs, a, won in items[:6]:
+        col = GREEN if won else RED
+        d.rounded_rectangle([80, y, W - 80, y + 110], radius=20, fill=(255, 255, 255, 8), outline=(col[0], col[1], col[2], 110), width=2)
+        # marker circle
+        cx = 145; cy = y + 55; r = 26
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=col)
+        if won:
+            d.line([(cx - 12, cy), (cx - 3, cy + 11)], fill=(8, 12, 10), width=5)
+            d.line([(cx - 3, cy + 11), (cx + 14, cy - 11)], fill=(8, 12, 10), width=5)
+        else:
+            d.line([(cx - 11, cy - 11), (cx + 11, cy + 11)], fill=(8, 12, 10), width=5)
+            d.line([(cx - 11, cy + 11), (cx + 11, cy - 11)], fill=(8, 12, 10), width=5)
+        pf = _font(34)
+        pk = pick if d.textlength(pick, font=pf) < 560 else pick[:34]
+        d.text((200, y + 18), pk, font=pf, fill=WHITE)
+        d.text((200, y + 60), f"{home} {hs}-{a} {away}", font=_font(28), fill=GREY)
+        y += 126
+    # record box
+    by = y + 20
+    d.rounded_rectangle([80, by, W - 80, by + 180], radius=28, fill=(34, 222, 128, 22), outline=GREEN, width=2)
+    ct(f"{w}W  –  {l}L", _font(72), by + 28, WHITE)
+    ct(f"{rate} hit rate", _font(34), by + 118, GREEN)
+    ct("Transparency always — we post the losses too.", _font(28), by + 210, GREY)
+    d.line([(80, H - 150), (W - 80, H - 150)], fill=(40, 52, 46), width=2)
+    ct("@WC2026signals", _font(34), H - 128, WHITE)
+    ct("18+  ·  Bet responsibly  ·  Not advice", _font(26), H - 78, GREY)
+    img.save(out, "PNG")
 
 def load_env():
     env = {}
@@ -74,18 +130,27 @@ def run():
     if not newly:
         print("no newly finished matches to grade."); return
 
+    total = w + l
+    rate = f"{round(100*w/total)}%" if total else "—"
+    today = datetime.datetime.now(datetime.timezone.utc).strftime("%b %d")
+
     lines = []
     for pick, home, away, hs, a, won in newly:
         mark = "✅" if won else "❌"
         lines.append(f"{mark} {pick} — {home} {hs}-{a} {away}")
-    total = w + l
-    rate = f"{round(100*w/total)}%" if total else "—"
-    today = datetime.datetime.now(datetime.timezone.utc).strftime("%b %d")
-    msg = (f"📈 <b>RESULTS — {today}</b>\n\n" + "\n".join(lines) +
+    cap = (f"📈 <b>RESULTS — {today}</b>\n\n" + "\n".join(lines) +
            f"\n\n🏆 Running record: <b>{w}W – {l}L</b> ({rate} hit rate)\n"
-           f"Transparency always — we post the losses too.\n\n"
-           f"18+ · Bet responsibly\n📡 @WC2026signals")
-    send(msg)
+           f"Transparency always — we post the losses too.\n\n18+ · Bet responsibly\n📡 @WC2026signals")
+
+    tmp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_wc_results.png")
+    try:
+        render_results_card(tmp, newly, w, l, rate, today)
+        with open(tmp, "rb") as f:
+            requests.post(f"{API}/sendPhoto", data={"chat_id": CHANNEL, "caption": cap, "parse_mode": "HTML"}, files={"photo": f}, timeout=60)
+        os.unlink(tmp)
+    except Exception as e:
+        print("results card error, sending text:", e)
+        send(cap)
     print(f"posted results: {len(newly)} graded | record {w}-{l}")
 
 if __name__ == "__main__":
