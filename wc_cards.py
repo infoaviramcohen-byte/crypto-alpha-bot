@@ -17,6 +17,8 @@ def load_env():
 ENV = load_env()
 WC_TOKEN = os.environ.get("WC_BOT_TOKEN") or ENV.get("WC_BOT_TOKEN", "")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY") or ENV.get("ANTHROPIC_API_KEY", "")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY") or ENV.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-flash-latest"
 CHANNEL = "-1003877748369"
 API = f"https://api.telegram.org/bot{WC_TOKEN}"
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wc_cards.db")
@@ -65,7 +67,7 @@ def flag_img(name, size):
     except Exception:
         return None
 
-def render_card(out, kind, accent, tA, tB, meta, picklabel, pick, conf, value):
+def render_card(out, kind, accent, tA, tB, meta, picklabel, pick, conf, value, score=""):
     img = Image.new("RGB", (W, H), DARK); d = ImageDraw.Draw(img, "RGBA")
     for y in range(H):
         t = y / H; d.line([(0, y), (W, y)], fill=(int(8 + 6 * t), int(14 + 11 * t), int(10 + 7 * t)))
@@ -95,7 +97,9 @@ def render_card(out, kind, accent, tA, tB, meta, picklabel, pick, conf, value):
     d.text((px0 + 40, py0 + 28), picklabel, font=font(26), fill=accent)
     pf = font(48)
     while d.textlength(pick, font=pf) > px1 - px0 - 80 and pf.size > 28: pf = font(pf.size - 2)
-    d.text((px0 + 40, py0 + 70), pick, font=pf, fill=WHITE)
+    d.text((px0 + 40, py0 + 66), pick, font=pf, fill=WHITE)
+    if score:
+        d.text((px0 + 40, py0 + 128), f"Predicted score:  {score}", font=font(30), fill=GOLD)
     if conf:
         by = py1 - 70; bx0, bx1 = px0 + 40, px1 - 40
         d.rounded_rectangle([bx0, by, bx1, by + 18], radius=9, fill=(40, 52, 46))
@@ -118,22 +122,29 @@ def todays_fixtures():
     return [e for e in evs if "World Cup" in (e.get("strLeague") or "")]
 
 def ai_predict(home, away):
-    base = {"pick": f"{home} to win", "confidence": 55, "value": "Match result", "reasons": ["Stronger squad on paper", "Better recent form", "Tournament experience edge"]}
-    if not ANTHROPIC_KEY:
+    base = {"pick": f"{home} to win", "score": "1-0", "confidence": 55, "value": "Match result",
+            "reasons": ["Stronger squad on paper", "Better recent form", "Tournament experience edge"]}
+    if not GEMINI_KEY:
         return base
     try:
-        import anthropic
-        c = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-        m = c.messages.create(model="claude-haiku-4-5-20251001", max_tokens=300,
-            messages=[{"role": "user", "content": (
-                f"AI football analyst for a betting-signals channel. Match: {home} vs {away}, FIFA World Cup 2026 group stage. "
-                "Give a concise, data-style lean based on general team strength and form. Reply ONLY with JSON: "
-                '{"pick":"<Team> to win|Draw","confidence":<integer 52-88>,"value":"<one short value-bet angle, e.g. Team -1 handicap or Over 2.5 goals>","reasons":["<r1>","<r2>","<r3>"]}. '
-                "No guarantees, no extra text.")}])
-        txt = m.content[0].text.strip().strip("`")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+        prompt = (
+            f"You are an AI football analyst for a betting-signals channel. Match: {home} vs {away}, "
+            "FIFA World Cup 2026 group stage. Analyze team strength, form and matchup, then give a data-style lean "
+            "and a most-likely final scoreline. Reply ONLY with compact JSON, no markdown: "
+            '{"pick":"<Team> to win|Draw","score":"<home_goals>-<away_goals>","confidence":<integer 52-88>,'
+            '"value":"<one short value-bet angle, e.g. Team -1 handicap or Over 2.5 goals>",'
+            '"reasons":["<r1>","<r2>","<r3>"]}. No extra text, no guarantees.')
+        r = requests.post(url, headers={"x-goog-api-key": GEMINI_KEY, "Content-Type": "application/json"},
+                          json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=40)
+        j = r.json()
+        if "error" in j:
+            print("gemini error:", str(j["error"].get("message", ""))[:140]); return base
+        txt = j["candidates"][0]["content"]["parts"][0]["text"].strip().strip("`")
         if txt.startswith("json"): txt = txt[4:]
         data = json.loads(txt[txt.find("{"):txt.rfind("}") + 1])
         data["confidence"] = int(data.get("confidence", 55))
+        data.setdefault("score", "")
         return data
     except Exception as e:
         print("ai_predict error:", e); return base
@@ -188,10 +199,13 @@ def run():
         pred = ai_predict(home, away)
         tmp = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"_wc_{eid}.png")
         render_card(tmp, "AI MATCH PREDICTION", GREEN, home, away, meta, "MODEL PICK",
-                    pred.get("pick", f"{home} to win"), pred.get("confidence", 55), "Value: " + pred.get("value", "Match result"))
+                    pred.get("pick", f"{home} to win"), pred.get("confidence", 55),
+                    "Value: " + pred.get("value", "Match result"), score=pred.get("score", ""))
         reasons = "\n".join(f"• {x}" for x in (pred.get("reasons") or [])[:3])
+        score_line = f"🔮 Predicted score: <b>{home} {pred.get('score','')} {away}</b>\n" if pred.get("score") else ""
         cap = (f"🤖 <b>AI MATCH PREDICTION</b>\n\n⚽ {home} vs {away}\n{meta}\n\n"
-               f"📊 Model lean: <b>{pred.get('pick','')}</b> ({pred.get('confidence',55)}%)\n{reasons}\n\n"
+               f"📊 Model lean: <b>{pred.get('pick','')}</b> ({pred.get('confidence',55)}%)\n"
+               f"{score_line}{reasons}\n\n"
                f"🎯 Value: <b>{pred.get('value','')}</b>\n\n18+ · Bet responsibly · Not advice\n📡 @WC2026signals")
         if post_card(tmp, cap):
             save_prediction(eid, home, away, pred.get("pick", f"{home} to win"), pred.get("value", ""))
