@@ -28,6 +28,22 @@ def load_env():
 ENV = load_env()
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or ENV.get("TELEGRAM_BOT_TOKEN", "")
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY") or ENV.get("ANTHROPIC_API_KEY", "")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY") or ENV.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-flash-latest"
+
+def smart_truncate(text, limit=300):
+    """Trim to a clean boundary (sentence end, else word) + ellipsis — never mid-word."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    # prefer ending at the last sentence punctuation
+    end = max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? "))
+    if end >= limit * 0.5:
+        return cut[:end + 1].strip()
+    # otherwise end at the last whole word
+    sp = cut.rfind(" ")
+    return (cut[:sp] if sp > 0 else cut).strip() + "…"
 CHANNELS = ["-1002481155935", "-1001652015415"]  # Crypto Alpha Feed + Crypto News AI
 API = f"https://api.telegram.org/bot{TOKEN}"
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "news.db")
@@ -214,32 +230,34 @@ def clean_summary(text):
     return text[:600] + "..." if len(text) > 600 else text
 
 def ai_summary_and_sentiment(title, raw_summary):
-    if not ANTHROPIC_KEY or ANTHROPIC_KEY == "your_key_here":
-        return clean_summary(raw_summary)[:280], sentiment_from_keywords(title + " " + raw_summary)
-    try:
-        client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=120,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"You are a crypto alpha channel writer. Given this news:\n"
-                    f"Title: {title}\nSummary: {raw_summary[:500]}\n\n"
-                    f"Write exactly 2 punchy lines (max 180 chars total) that a crypto trader would find valuable. "
-                    f"No fluff. Then on a new line write only one word: BULLISH, BEARISH, or NEUTRAL."
-                )
-            }]
-        )
-        lines = msg.content[0].text.strip().split("\n")
-        sentiment_word = lines[-1].strip().upper()
-        summary = "\n".join(lines[:-1]).strip()
-        if sentiment_word not in ("BULLISH", "BEARISH", "NEUTRAL"):
-            sentiment_word = sentiment_from_keywords(title)
-        return summary, sentiment_word
-    except Exception as e:
-        print(f"AI error: {e}")
-        return clean_summary(raw_summary)[:280], sentiment_from_keywords(title + " " + raw_summary)
+    raw = clean_summary(raw_summary)
+    if GEMINI_KEY:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+            prompt = (
+                f"You are a crypto alpha channel writer. News:\nTitle: {title}\nSummary: {raw[:600]}\n\n"
+                "Write exactly 2 punchy, COMPLETE sentences (max 220 chars total) a crypto trader would find valuable. "
+                "Never cut off mid-sentence. No fluff, no hashtags. Then on a new line write ONE word only: "
+                "BULLISH, BEARISH, or NEUTRAL.")
+            r = requests.post(url, headers={"x-goog-api-key": GEMINI_KEY, "Content-Type": "application/json"},
+                              json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
+            j = r.json()
+            if "error" not in j:
+                txt = j["candidates"][0]["content"]["parts"][0]["text"].strip()
+                parts = [x for x in txt.split("\n") if x.strip()]
+                sent = parts[-1].strip().upper() if parts else ""
+                if sent in ("BULLISH", "BEARISH", "NEUTRAL"):
+                    summary = " ".join(parts[:-1]).strip()
+                else:
+                    summary, sent = txt, sentiment_from_keywords(title + " " + raw)
+                if summary:
+                    return summary, sent
+            else:
+                print("gemini summary error:", str(j["error"].get("message", ""))[:100])
+        except Exception as e:
+            print("gemini summary error:", e)
+    # Fallback: clean, sentence-aware truncation (never mid-word)
+    return smart_truncate(raw, 300), sentiment_from_keywords(title + " " + raw)
 
 def sentiment_from_keywords(text):
     t = text.lower()
