@@ -17,8 +17,37 @@ USERS_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_users.
 GUARDIS = "https://guardis.io/?ref=652C9829"
 SITE = "https://botarenasol.com/?utm_source=telegram&utm_medium=bot&utm_campaign=smartmoney_bot"
 
+# --- Supabase persistence (falls back to local CSV if not configured) ---
+SUPABASE_URL = env("SUPABASE_URL").rstrip("/")
+SUPABASE_KEY = env("SUPABASE_SERVICE_KEY")
+SB_TABLE = "telegram_bot_users"
+
+def sb_on():
+    return bool(SUPABASE_URL and SUPABASE_KEY)
+
+def sb_upsert(row):
+    try:
+        h = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
+             "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"}
+        requests.post(f"{SUPABASE_URL}/rest/v1/{SB_TABLE}", headers=h, json=row, timeout=15)
+    except Exception as e:
+        print("sb_upsert error:", e, flush=True)
+
+def sb_alpha_ids():
+    """All telegram ids opted in to weekly alpha (for the broadcaster)."""
+    try:
+        h = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+        r = requests.get(f"{SUPABASE_URL}/rest/v1/{SB_TABLE}?select=id&alpha_optin=eq.true", headers=h, timeout=20)
+        return [str(row["id"]) for row in r.json()]
+    except Exception as e:
+        print("sb_alpha_ids error:", e, flush=True); return []
+
 def log_user(u):
     uid = str(u.get("id"))
+    if sb_on():
+        sb_upsert({"id": uid, "username": u.get("username", ""), "first_name": u.get("first_name", ""),
+                   "first_seen": datetime.datetime.now(datetime.timezone.utc).isoformat()})
+        return
     seen = set()
     if os.path.exists(USERS_CSV):
         for row in csv.reader(open(USERS_CSV)):
@@ -29,6 +58,28 @@ def log_user(u):
     with open(USERS_CSV, "a", newline="") as f:
         w = csv.writer(f)
         if new: w.writerow(["id", "username", "first_name", "first_seen"])
+        w.writerow([uid, u.get("username", ""), u.get("first_name", ""),
+                    datetime.datetime.now(datetime.timezone.utc).isoformat()])
+
+ALPHA_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "alpha_subscribers.csv")
+
+def record_optin(u):
+    """Add a user to the free weekly-alpha list (DM-able, for broadcasts)."""
+    uid = str(u.get("id"))
+    if sb_on():
+        sb_upsert({"id": uid, "username": u.get("username", ""), "first_name": u.get("first_name", ""),
+                   "alpha_optin": True, "opted_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
+        return
+    seen = set()
+    if os.path.exists(ALPHA_CSV):
+        for row in csv.reader(open(ALPHA_CSV)):
+            if row: seen.add(row[0])
+    if uid in seen:
+        return
+    new = not os.path.exists(ALPHA_CSV)
+    with open(ALPHA_CSV, "a", newline="") as f:
+        w = csv.writer(f)
+        if new: w.writerow(["id", "username", "first_name", "opted_at"])
         w.writerow([uid, u.get("username", ""), u.get("first_name", ""),
                     datetime.datetime.now(datetime.timezone.utc).isoformat()])
 
@@ -84,9 +135,37 @@ RESULT = ("🥇 <b>Your match: Guardis</b>\n\n"
           "👉 Start in 60 seconds, or see how it ranked vs the rest.")
 
 RESULT_KB = kb([
+    [{"text": "🎁 Free Smart-Money Playbook", "callback_data": "watchlist"}],
     [{"text": "🥇 Try Guardis →", "url": GUARDIS}],
     [{"text": "🏆 See Full Rankings →", "url": SITE}],
 ])
+
+WATCHLIST = ("🐋 <b>The Smart-Money Playbook</b>\n<i>your free starter guide</i>\n\n"
+             "How the sharpest Solana traders find winners before the crowd:\n\n"
+             "1️⃣ Don't chase price — track the money. Price is just the shadow.\n"
+             "2️⃣ Check <b>who funded the holders</b>, not just the chart.\n"
+             "3️⃣ Watch wallet clusters — smart money moves together.\n"
+             "4️⃣ Follow proven wallets into new launches early.\n"
+             "5️⃣ Always scan for honeypots &amp; rugs before you buy.\n\n"
+             "🔥 <b>Narratives smart money is watching now:</b>\n"
+             "• Solana memecoins (Pump.fun launches)\n"
+             "• AI agents\n"
+             "• Tokenized real-world assets\n\n"
+             "⚠️ Doing all this by hand is impossible. Guardis tracks 10,000+ smart wallets "
+             "in real time and does it for you 👇\n\n"
+             "<i>Not financial advice · DYOR</i>")
+
+WATCHLIST_KB = kb([
+    [{"text": "🔔 Get FREE weekly alpha →", "callback_data": "alpha_optin"}],
+    [{"text": "🥇 Track it live on Guardis →", "url": GUARDIS}],
+])
+
+ALPHA_CONFIRM = ("✅ <b>You're in!</b>\n\n"
+                 "You'll get free smart-money alpha every week — what the sharpest wallets are "
+                 "watching, straight to your DMs. 🐋\n\n"
+                 "While you wait, start tracking smart money live 👇")
+
+ALPHA_CONFIRM_KB = kb([[{"text": "🥇 Track smart money live →", "url": GUARDIS}]])
 
 def handle_cb(cb):
     data = cb.get("data", "")
@@ -98,6 +177,11 @@ def handle_cb(cb):
         edit(chat_id, mid, text, kb(rows))
     elif data == "res":
         edit(chat_id, mid, RESULT, RESULT_KB)
+    elif data == "watchlist":
+        edit(chat_id, mid, WATCHLIST, WATCHLIST_KB)
+    elif data == "alpha_optin":
+        record_optin(cb.get("from", {}))
+        edit(chat_id, mid, ALPHA_CONFIRM, ALPHA_CONFIRM_KB)
 
 def main():
     try:
