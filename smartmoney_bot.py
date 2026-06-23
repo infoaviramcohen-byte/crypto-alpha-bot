@@ -102,6 +102,18 @@ def edit(chat_id, mid, text, markup=None):
     if not j.get("ok"): print("EDIT FAIL:", j.get("description"), flush=True)
     return j
 
+def send_photo(chat_id, path, caption, markup=None):
+    import json
+    d = {"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"}
+    if markup: d["reply_markup"] = json.dumps(markup)
+    try:
+        with open(path, "rb") as f:
+            j = requests.post(f"{API}/sendPhoto", data=d, files={"photo": f}, timeout=30).json()
+        if not j.get("ok"): print("PHOTO FAIL:", j.get("description"), flush=True)
+        return j
+    except Exception as e:
+        print("send_photo error:", e, flush=True); return {}
+
 def answer_cb(cb_id):
     requests.post(f"{API}/answerCallbackQuery", data={"callback_query_id": cb_id}, timeout=20)
 
@@ -111,7 +123,10 @@ WELCOME = ("👋 <b>Welcome to Smart Money Pros</b>\n\n"
 
 def handle_start(chat_id, user):
     log_user(user)
-    send(chat_id, WELCOME, kb([[{"text": "🚀 Find my bot", "callback_data": "q1"}]]))
+    if os.path.exists(BONUS_IMG):
+        send_photo(chat_id, BONUS_IMG, BONUS_RULES, BONUS_KB)  # $20 banner + offer
+    else:
+        send(chat_id, BONUS_RULES, BONUS_KB)  # text fallback
 
 STEPS = {
     "q1": ("<b>1/3 · How would you describe yourself?</b>",
@@ -167,6 +182,50 @@ ALPHA_CONFIRM = ("✅ <b>You're in!</b>\n\n"
 
 ALPHA_CONFIRM_KB = kb([[{"text": "🥇 Track smart money live →", "url": GUARDIS}]])
 
+# ---- $20 bonus claim flow ----
+AWAITING = set()  # user ids currently submitting their wallet
+CLAIMS_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bonus_claims.csv")
+BONUS_IMG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bonus_banner.png")
+
+def record_claim(u, wallet):
+    new = not os.path.exists(CLAIMS_CSV)
+    with open(CLAIMS_CSV, "a", newline="") as f:
+        w = csv.writer(f)
+        if new: w.writerow(["id", "username", "first_name", "wallet", "claimed_at", "status"])
+        w.writerow([str(u.get("id")), u.get("username", ""), u.get("first_name", ""),
+                    wallet, datetime.datetime.now(datetime.timezone.utc).isoformat(), "pending"])
+    print("CLAIM:", u.get("username"), wallet, flush=True)
+
+BONUS_RULES = ("🎁 <b>FREE $20 to Trade on Guardis</b>\n\n"
+               "Deposit just $10 → we add <b>$20 on top</b>. That's $30 to trade with. 🔥\n\n"
+               "<b>How to claim (3 steps):</b>\n"
+               "1️⃣ Sign up on Guardis with the button below (new account via our link)\n"
+               "2️⃣ Make your first deposit — <b>minimum $10</b>\n"
+               "3️⃣ Tap \"I've deposited\" and send your Guardis wallet to claim\n\n"
+               "We verify your deposit + send your $20 within 24h. 🐋\n\n"
+               "⚠️ One per person · new accounts only · must deposit via our link")
+
+BONUS_KB = kb([
+    [{"text": "✅ Sign up on Guardis →", "url": GUARDIS}],
+    [{"text": "💰 I've deposited — claim my $20", "callback_data": "claim"}],
+])
+
+ASK_WALLET = ("💰 <b>Almost there!</b>\n\n"
+              "Send me your <b>Guardis wallet address</b> (the one you deposited with) so we can "
+              "verify and send your $20. 👇\n\nJust paste it here as a message.")
+
+CLAIM_DONE = ("✅ <b>Claim received!</b>\n\n"
+              "We'll verify your $10+ deposit and send your $20 to your wallet within 24 hours. 🐋\n\n"
+              "While you wait, start tracking smart money 👇")
+
+CLAIM_DONE_KB = kb([[{"text": "🥇 Track smart money live →", "url": GUARDIS}]])
+
+def handle_bonus(chat_id):
+    if os.path.exists(BONUS_IMG):
+        send_photo(chat_id, BONUS_IMG, BONUS_RULES, BONUS_KB)
+    else:
+        send(chat_id, BONUS_RULES, BONUS_KB)
+
 def handle_cb(cb):
     data = cb.get("data", "")
     chat_id = cb["message"]["chat"]["id"]
@@ -182,6 +241,11 @@ def handle_cb(cb):
     elif data == "alpha_optin":
         record_optin(cb.get("from", {}))
         edit(chat_id, mid, ALPHA_CONFIRM, ALPHA_CONFIRM_KB)
+    elif data == "bonus":
+        edit(chat_id, mid, BONUS_RULES, BONUS_KB)
+    elif data == "claim":
+        AWAITING.add(str(cb.get("from", {}).get("id")))
+        send(chat_id, ASK_WALLET)  # send (not edit): start msg is now a photo
 
 def main():
     try:
@@ -200,9 +264,21 @@ def main():
                 offset = upd["update_id"] + 1
                 if "message" in upd:
                     m = upd["message"]
-                    if (m.get("text") or "").startswith("/start"):
-                        print("→ /start from", m["chat"]["id"], flush=True)
-                        handle_start(m["chat"]["id"], m.get("from", {}))
+                    txt = (m.get("text") or "")
+                    chat_id = m["chat"]["id"]
+                    user = m.get("from", {})
+                    uid = str(user.get("id"))
+                    if txt.startswith("/start"):
+                        print("→ /start from", chat_id, flush=True)
+                        handle_start(chat_id, user)
+                    elif txt.startswith("/bonus"):
+                        print("→ /bonus from", chat_id, flush=True)
+                        handle_bonus(chat_id)
+                    elif uid in AWAITING and txt and not txt.startswith("/"):
+                        print("→ wallet claim from", uid, flush=True)
+                        record_claim(user, txt.strip())
+                        AWAITING.discard(uid)
+                        send(chat_id, CLAIM_DONE, CLAIM_DONE_KB)
                 elif "callback_query" in upd:
                     print("→ callback:", upd["callback_query"].get("data"), flush=True)
                     handle_cb(upd["callback_query"])
