@@ -21,15 +21,16 @@ SITE = "https://botarenasol.com/?utm_source=telegram&utm_medium=bot&utm_campaign
 SUPABASE_URL = env("SUPABASE_URL").rstrip("/")
 SUPABASE_KEY = env("SUPABASE_SERVICE_KEY")
 SB_TABLE = "telegram_bot_users"
+SB_CLAIMS = "telegram_bonus_claims"
 
 def sb_on():
     return bool(SUPABASE_URL and SUPABASE_KEY)
 
-def sb_upsert(row):
+def sb_upsert(row, table=SB_TABLE):
     try:
         h = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}",
              "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"}
-        requests.post(f"{SUPABASE_URL}/rest/v1/{SB_TABLE}", headers=h, json=row, timeout=15)
+        requests.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=h, json=row, timeout=15)
     except Exception as e:
         print("sb_upsert error:", e, flush=True)
 
@@ -188,6 +189,11 @@ CLAIMS_CSV = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bonus_cla
 BONUS_IMG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bonus_banner.png")
 
 def record_claim(u, wallet):
+    if sb_on():
+        sb_upsert({"id": str(u.get("id")), "username": u.get("username", ""),
+                   "first_name": u.get("first_name", ""), "wallet": wallet,
+                   "claimed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                   "status": "pending"}, table=SB_CLAIMS)
     new = not os.path.exists(CLAIMS_CSV)
     with open(CLAIMS_CSV, "a", newline="") as f:
         w = csv.writer(f)
