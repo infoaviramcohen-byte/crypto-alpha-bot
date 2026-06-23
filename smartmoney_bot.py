@@ -20,6 +20,7 @@ SITE = "https://botarenasol.com/?utm_source=telegram&utm_medium=bot&utm_campaign
 # --- Supabase persistence (falls back to local CSV if not configured) ---
 SUPABASE_URL = env("SUPABASE_URL").rstrip("/")
 SUPABASE_KEY = env("SUPABASE_SERVICE_KEY")
+ADMIN_ID = env("ADMIN_CHAT_ID") or "7028544369"  # Aviram — gets a DM on every claim
 SB_TABLE = "telegram_bot_users"
 SB_CLAIMS = "telegram_bonus_claims"
 
@@ -201,6 +202,10 @@ def record_claim(u, wallet):
         w.writerow([str(u.get("id")), u.get("username", ""), u.get("first_name", ""),
                     wallet, datetime.datetime.now(datetime.timezone.utc).isoformat(), "pending"])
     print("CLAIM:", u.get("username"), wallet, flush=True)
+    if ADMIN_ID:
+        uname = ("@" + u.get("username")) if u.get("username") else (u.get("first_name") or "user")
+        send(ADMIN_ID, f"🟢 <b>New $20 claim!</b>\n\n👤 {uname} (id <code>{u.get('id')}</code>)\n"
+                       f"💰 wallet: <code>{wallet}</code>\n\n→ verify their $10+ deposit, then send $20")
 
 BONUS_RULES = ("🎁 <b>FREE $20 to Trade on Guardis</b>\n\n"
                "Deposit just $10 → we add <b>$20 on top</b>. That's $30 to trade with. 🔥\n\n"
