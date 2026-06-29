@@ -273,7 +273,7 @@ def sentiment_badge(sentiment):
     return {"BULLISH": "🟢 Bullish", "BEARISH": "🔴 Bearish", "NEUTRAL": "⚪ Neutral"}.get(sentiment, "⚪ Neutral")
 
 # Rotating CTA buttons — A/B test which hook drives the most clicks (tracked via utm_content in GA4).
-CTA_BASE = "https://funtico.com/?r=66HERF&utm_content={content}"
+CTA_BASE = "https://funtico.com/?r=66HERF"
 CTAS = [
     ("🎮 Play Free, Win Real Prizes →", "cta_play"),
     ("🎁 Claim 500 $TICO + 5 Passes →", "cta_bonus"),
