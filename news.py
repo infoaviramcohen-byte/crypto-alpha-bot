@@ -273,12 +273,12 @@ def sentiment_badge(sentiment):
     return {"BULLISH": "🟢 Bullish", "BEARISH": "🔴 Bearish", "NEUTRAL": "⚪ Neutral"}.get(sentiment, "⚪ Neutral")
 
 # Rotating CTA buttons — A/B test which hook drives the most clicks (tracked via utm_content in GA4).
-CTA_BASE = "https://botarenasol.com/?utm_source=telegram&utm_medium=news_cta&utm_campaign=news_rotation&utm_content={content}#comparison"
+CTA_BASE = "https://funtico.com/?r=66HERF&utm_content={content}"
 CTAS = [
-    ("🐋 Track Smart Money →", "cta_smartmoney"),
-    ("💸 Trade with 35% Cashback →", "cta_cashback"),
-    ("⚡ Don't Miss the Next Move →", "cta_fomo"),
-    ("🤖 Compare Top Solana Bots →", "cta_compare"),
+    ("🎮 Play Free, Win Real Prizes →", "cta_play"),
+    ("🎁 Claim 500 $TICO + 5 Passes →", "cta_bonus"),
+    ("🎰 Free Spins on Funtico →", "cta_spins"),
+    ("🏆 Join the Funtico Tournaments →", "cta_tournament"),
 ]
 CHAN_LABEL = {"-1002481155935": "alphafeed", "-1001652015415": "cryptonewsai"}
 
